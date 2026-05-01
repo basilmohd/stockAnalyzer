@@ -79,11 +79,13 @@ portfolio-agent/
 - Always run pytest after creating any new module
 
 ## Current Status
-Week 0 checkpoint — core infrastructure built.
-- config.py, core/redis_client.py, core/db.py complete
-- All 4 DB models (Signal, Order, Approval, PortfolioSnapshot) created
-- Folder skeleton in place (agent/, data/, routes/, mocks/, tests/)
-Next: build remaining core/ services, entry points, stubs, and test_skeleton.py
+Week 0 COMPLETE ✓
+- Project skeleton fully built
+- Both entry points (webhook_server.py + scheduler.py) running
+- All 4 DB models created and tested
+- Mock data layer working (8 stocks, news sentiment)
+- 11/11 skeleton tests passing
+Next: Week 1 — Kite Connect auth + real holdings fetch
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

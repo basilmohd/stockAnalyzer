@@ -19,7 +19,9 @@ class RedisClient:
         """
         self.available = False
         try:
-            self._client = redis.Redis.from_url(url, decode_responses=True)
+            self._client = redis.Redis.from_url(
+                url, decode_responses=True, socket_connect_timeout=2
+            )
             self._client.ping()
             self.available = True
             logger.info("Redis connected: %s", url)

@@ -1,0 +1,96 @@
+# Portfolio Agent — AI Stock Management System
+
+## What This Is
+Python-based AI agent for managing an Indian equity portfolio (20+ NSE stocks).
+Built by Basil Mohd Sufyan. Local dev on Windows/WSL, deploys to AWS EC2 t3.small Mumbai.
+
+## Architecture — Two Separate Processes
+- webhook_server.py → FastAPI + Uvicorn on port 8000
+  Handles: Telegram button tap callbacks, Kite OAuth redirect, /health endpoint
+- scheduler.py → APScheduler with AsyncIOScheduler (timezone: Asia/Kolkata)
+  Handles: All timed jobs — briefing 8:30AM, SL monitor every 5min, signals 11AM+2PM,
+  scanner 12:30PM, post-market 4PM, health report Sunday 7PM
+
+## Shared State
+- Redis → live price cache (60s TTL), Kite access token (24hr TTL), indicator cache (1hr TTL)
+- SQLite → audit trail, signals, orders, approvals, portfolio snapshots
+- .env → all secrets, loaded by both processes via python-dotenv
+
+## Tech Stack
+Python 3.11, FastAPI, Uvicorn, APScheduler, SQLAlchemy, SQLite, Redis,
+kiteconnect, anthropic, python-telegram-bot, pandas-ta, yfinance,
+newsapi-python, httpx, python-dotenv, pytest
+
+## Folder Structure
+portfolio-agent/
+├── webhook_server.py       ← Entry point A
+├── scheduler.py            ← Entry point B
+├── config.py               ← All settings and risk rules
+├── .env                    ← Secrets (never commit)
+├── .env.example            ← Key names with empty values
+├── requirements.txt
+├── CLAUDE.md
+├── core/                   ← Shared services (used by both processes)
+│   ├── kite_client.py      ← Kite auth, holdings, orders, WebSocket
+│   ├── telegram_bot.py     ← Send messages, format alerts
+│   ├── claude_client.py    ← Claude API wrapper
+│   ├── approval.py         ← Token gen, validation, expiry
+│   ├── redis_client.py     ← Redis get/set/delete wrappers
+│   └── db.py               ← SQLAlchemy engine + SessionLocal + Base
+├── models/                 ← SQLAlchemy table definitions
+│   ├── signal.py
+│   ├── order.py
+│   ├── approval.py
+│   └── portfolio_snap.py
+├── data/                   ← Market data pipeline
+│   ├── portfolio.py        ← Holdings fetch + context builder
+│   ├── technicals.py       ← pandas-ta indicators
+│   ├── news.py             ← NewsAPI + sentiment
+│   └── screener.py         ← Nifty 200 scanner
+├── agent/                  ← Intelligence modules
+│   ├── stoploss.py
+│   ├── briefing.py
+│   ├── signals.py
+│   ├── scanner.py
+│   └── health.py
+├── routes/                 ← FastAPI route handlers
+│   ├── kite_routes.py
+│   ├── telegram_routes.py
+│   └── approval_routes.py
+├── mocks/                  ← Local dev mock data
+│   ├── kite_mock.py
+│   └── news_mock.py
+├── tests/                  ← pytest test files
+│   └── test_skeleton.py
+├── logs/                   ← Rotating log files (gitignored)
+├── data_store/             ← SQLite db file (gitignored)
+└── deploy/                 ← EC2 deployment scripts
+    ├── setup.sh
+    ├── portfolio-webhook.service
+    └── portfolio-scheduler.service
+
+## Dev Rules — READ EVERY SESSION
+- USE_MOCK=true in .env during local dev — never call real Kite API locally
+- All secrets in .env only — never hardcode any key or token
+- Every function needs a docstring and type hints
+- Both processes share Redis + SQLite — never share state any other way
+- Do not mix scheduler logic into webhook_server.py or vice versa
+- Processes never call each other directly — communicate via SQLite only
+- Always run pytest after creating any new module
+
+## Current Status
+Week 0 checkpoint — core infrastructure built.
+- config.py, core/redis_client.py, core/db.py complete
+- All 4 DB models (Signal, Order, Approval, PortfolioSnapshot) created
+- Folder skeleton in place (agent/, data/, routes/, mocks/, tests/)
+Next: build remaining core/ services, entry points, stubs, and test_skeleton.py
+
+## Indian Market Context
+- Market hours: 09:15 to 15:30 IST, Monday to Friday
+- Exchange: NSE
+- Broker: Zerodha Kite Connect API
+- Portfolio: 20+ delivery (CNC) equity holdings
+- All orders: CNC product type (delivery, not intraday)
+- Stop loss default: -15% from entry price
+- Max single position: 20% of portfolio value
+- Signal confidence threshold: 0.75 (75%)

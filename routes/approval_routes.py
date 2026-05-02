@@ -1,14 +1,13 @@
 """
-Signal approval routes — Telegram button tap targets.
+Signal approval routes — HTTP fallback for local dev (Telegram webhooks not reachable locally).
 """
 import logging
-from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from core.db import SessionLocal
-from models.approval import Approval
+from core.approval import mark_approved, mark_skipped, validate_token
+from core.telegram_bot import send_alert
 
 logger = logging.getLogger(__name__)
 
@@ -16,29 +15,49 @@ router = APIRouter()
 
 
 @router.post("/{token}")
-async def approve_signal(token: str) -> JSONResponse:
+async def approve_signal(
+    token: str,
+    action: str = Query(default="approve"),
+) -> JSONResponse:
     """
-    Validate a one-time approval token against the SQLite approvals table.
-    Order execution wired in Week 2.
+    HTTP fallback endpoint to approve or skip a signal token.
+    Used during local dev since Telegram cannot POST to localhost.
+    action: "approve" (default) | "skip"
     """
-    logger.info("Approval request received for token: %s", token)
-
-    with SessionLocal() as db:
-        record: Approval | None = db.query(Approval).filter_by(token=token).first()
-
-    if record is None:
+    if action not in ("approve", "skip"):
         return JSONResponse(
-            status_code=404,
-            content={"status": "error", "message": "Token not found"},
+            status_code=400,
+            content={"status": "error", "message": "action must be 'approve' or 'skip'"},
         )
 
-    if record.expires_at < datetime.utcnow():
+    logger.info("HTTP approval: action=%s token=%s...", action, token[:8])
+
+    result = validate_token(token)
+    if not result["valid"]:
         return JSONResponse(
-            status_code=410,
-            content={"status": "error", "message": "Token expired"},
+            status_code=422,
+            content={"status": "error", "message": result["reason"]},
         )
 
+    if action == "approve":
+        mark_approved(token)
+        await send_alert(
+            "Order Approved",
+            f"Token {token[:8]}... approved via HTTP fallback. Execution in progress.",
+            alert_type="SUCCESS",
+        )
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ok", "message": "Token approved"},
+        )
+
+    mark_skipped(token)
+    await send_alert(
+        "Signal Skipped",
+        f"Token {token[:8]}... skipped via HTTP fallback.",
+        alert_type="INFO",
+    )
     return JSONResponse(
         status_code=200,
-        content={"status": "ok", "message": "Token valid — execution coming in Week 2"},
+        content={"status": "ok", "message": "Token skipped"},
     )

@@ -5,7 +5,7 @@ Run: uvicorn webhook_server:app --host 0.0.0.0 --port 8000 --reload
 """
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime,timezone
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -54,7 +54,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "mode": "mock" if USE_MOCK else "live",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 

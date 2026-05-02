@@ -17,7 +17,9 @@
       "Bash(py -3.11 -c \"import pandas; print\\(pandas.__version__\\)\")",
       "Bash(/c/Users/basil/AppData/Roaming/uv/python/cpython-3.12.12-windows-x86_64-none/python.exe *)",
       "Bash(where python *)",
-      "Bash(pip list *)"
+      "Bash(pip list *)",
+      "Bash(py -3 -c ' *)",
+      "Bash(py -3 -m pip install python-telegram-bot)"
     ]
   }
 }

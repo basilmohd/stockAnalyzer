@@ -93,8 +93,15 @@ Week 1 COMPLETE ✓ (mock mode)
 - Technical indicators: RSI, MACD, Bollinger, 200DMA computed via pandas-ta
 - OAuth route handlers built (/kite/login, /callback, /status)
 - 13/13 Week 1 tests passing on mock data
-Next: Monday — swap USE_MOCK=false, test with real Kite credentials
-Then: Week 2 — Telegram bot + approval flow
+
+Week 2 COMPLETE ✓
+- Telegram bot fully integrated — real messages sending
+- All 4 message types working: briefing, signal, SL breach, weekly report
+- Approval token engine: generate, validate, approve, skip, expire
+- Callback handler wired in telegram_routes.py
+- Tested live on phone: briefing, SL alert, signal alert, health report all received
+- 37/37 tests passing
+Next: Week 3 — Stop-loss monitor (first real protection module)
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

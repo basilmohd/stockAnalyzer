@@ -13,7 +13,19 @@ router = APIRouter()
 
 @router.post("/webhook")
 async def telegram_webhook(request: Request) -> dict:
-    """Stub: receive Telegram update payloads."""
+    """
+    Receive Telegram update payloads. Logs update type and approval callbacks.
+    Full callback handling wired in Week 2.
+    """
     payload: Any = await request.json()
-    logger.info("Telegram webhook received: %s", payload)
+
+    if "callback_query" in payload:
+        data = payload["callback_query"].get("data", "")
+        logger.info("Approval callback received: %s", data)
+    elif "message" in payload:
+        logger.info("Telegram update type: message")
+    else:
+        update_type = next(iter(payload.keys()), "unknown")
+        logger.info("Telegram update type: %s", update_type)
+
     return {"status": "ok"}

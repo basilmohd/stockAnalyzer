@@ -36,5 +36,11 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     """Create all tables defined on Base. Safe to call on every startup."""
+    # Import all models so SQLAlchemy registers them before create_all resolves FKs.
+    import models.signal          # noqa: F401
+    import models.order           # noqa: F401
+    import models.approval        # noqa: F401
+    import models.portfolio_snap  # noqa: F401
+
     Base.metadata.create_all(engine)
     logger.info("Database initialised")

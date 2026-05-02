@@ -85,7 +85,16 @@ Week 0 COMPLETE ✓
 - All 4 DB models created and tested
 - Mock data layer working (8 stocks, news sentiment)
 - 11/11 skeleton tests passing
-Next: Week 1 — Kite Connect auth + real holdings fetch
+
+Week 1 COMPLETE ✓ (mock mode)
+- KiteClient wrapper built with full mock/live switch
+- Holdings fetch, quote, historical data, order placement all working
+- Portfolio context builder with SL status and risk flags
+- Technical indicators: RSI, MACD, Bollinger, 200DMA computed via pandas-ta
+- OAuth route handlers built (/kite/login, /callback, /status)
+- 13/13 Week 1 tests passing on mock data
+Next: Monday — swap USE_MOCK=false, test with real Kite credentials
+Then: Week 2 — Telegram bot + approval flow
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p core models data agent routes mocks tests logs data_store deploy)",
+      "Bash(touch logs/.gitkeep data_store/.gitkeep)",
+      "Bash(python3 *)",
+      "Bash(python *)",
+      "Bash(pip install *)",
+      "Bash(git add *)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(kill %1)",
+      "Bash(wait)",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(curl -s http://localhost:8000/kite/login)",
+      "Bash(curl -s http://localhost:8000/kite/status)",
+      "Bash(curl -s \"http://localhost:8000/kite/callback?request_token=test_mock_token\")",
+      "Bash(py -3.11 -c \"import pandas; print\\(pandas.__version__\\)\")",
+      "Bash(/c/Users/basil/AppData/Roaming/uv/python/cpython-3.12.12-windows-x86_64-none/python.exe *)",
+      "Bash(where python *)",
+      "Bash(pip list *)"
+    ]
+  }
+}

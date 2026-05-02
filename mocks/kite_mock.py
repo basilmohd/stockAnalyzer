@@ -52,19 +52,25 @@ class MockKiteClient:
         return holdings
 
     def get_quote(self, symbols: list[str]) -> dict[str, dict[str, Any]]:
-        """Return OHLCV quote data for each requested symbol."""
+        """Return OHLCV quote data for each requested symbol.
+
+        Accepts both bare symbols ("ICICIBANK") and exchange-prefixed form ("NSE:ICICIBANK").
+        The returned dict is always keyed as "NSE:SYMBOL".
+        """
         by_symbol = {r["tradingsymbol"]: r for r in _HOLDINGS_DATA}
         result: dict[str, dict[str, Any]] = {}
         for sym in symbols:
-            base = by_symbol.get(sym)
+            bare = sym.split(":")[-1]  # "NSE:ICICIBANK" -> "ICICIBANK"
+            base = by_symbol.get(bare)
             if base is None:
                 continue
             lp = base["last_price"]
-            off = _OHLCV_OFFSETS.get(sym, (0, 0.01, 0.01, 1_000_000))
+            off = _OHLCV_OFFSETS.get(bare, (0, 0.01, 0.01, 1_000_000))
             open_price = round(lp + off[0], 2)
             high = round(lp * (1 + off[1]), 2)
             low  = round(lp * (1 - off[2]), 2)
-            result[f"NSE:{sym}"] = {
+            key = sym if ":" in sym else f"NSE:{sym}"
+            result[key] = {
                 "last_price":    lp,
                 "open":          open_price,
                 "high":          high,
@@ -77,14 +83,19 @@ class MockKiteClient:
 
     def get_historical_data(
         self,
-        symbol: str,
-        from_date: datetime,
-        to_date: datetime,
+        symbol,  # str tradingsymbol OR int instrument_token (passed by KiteClient)
+        from_date,  # datetime or "YYYY-MM-DD" string
+        to_date,    # datetime or "YYYY-MM-DD" string
         interval: str = "day",
     ) -> list[dict[str, Any]]:
         """Return 200 rows of reproducible fake OHLCV history for a symbol."""
         by_symbol = {r["tradingsymbol"]: r for r in _HOLDINGS_DATA}
-        base_price = by_symbol.get(symbol, {}).get("avg_price", 1000.0)
+        by_token = {r["instrument_token"]: r for r in _HOLDINGS_DATA}
+        row = by_symbol.get(symbol) or by_token.get(symbol, {})
+        base_price = row.get("avg_price", 1000.0)
+
+        if isinstance(to_date, str):
+            to_date = datetime.strptime(to_date, "%Y-%m-%d")
 
         rng = random.Random(42)
         rows: list[dict[str, Any]] = []

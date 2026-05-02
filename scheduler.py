@@ -42,7 +42,9 @@ def market_day_check() -> bool:
 
 async def briefing_job() -> None:
     """Morning briefing: portfolio overview + overnight news digest."""
-    logger.info("briefing_job triggered")
+    from agent.briefing import run_briefing
+    result = await run_briefing()
+    logger.info("briefing_job complete (success=%s)", result)
 
 
 async def signal_job_am() -> None:

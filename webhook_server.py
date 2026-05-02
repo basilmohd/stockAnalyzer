@@ -77,6 +77,14 @@ def get_news(symbol: str, request: Request) -> dict:
     return {"symbol": symbol.upper(), "status": "ok", "data": json.loads(cached)}
 
 
+@app.post("/briefing/trigger")
+async def trigger_briefing() -> dict:
+    """Manually trigger the morning briefing — sends result to Telegram immediately."""
+    from agent.briefing import run_briefing
+    success = await run_briefing()
+    return {"triggered": True, "success": success}
+
+
 if __name__ == "__main__":
     import uvicorn
 

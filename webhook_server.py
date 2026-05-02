@@ -3,12 +3,13 @@ Entry point A — FastAPI webhook server.
 Handles Telegram callbacks, Kite OAuth redirect, and approval endpoints.
 Run: uvicorn webhook_server:app --host 0.0.0.0 --port 8000 --reload
 """
+import json
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime,timezone
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from config import USE_MOCK, REDIS_URL
 from core.db import init_db
@@ -56,6 +57,32 @@ def health() -> dict:
         "mode": "mock" if USE_MOCK else "live",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.get("/technicals/{symbol}")
+def get_technicals(symbol: str, request: Request) -> dict:
+    """Return cached technical indicators for *symbol* from Redis."""
+    cached = request.app.state.redis.get(f"indicators:{symbol.upper()}")
+    if not cached:
+        return {"symbol": symbol.upper(), "status": "not_cached", "data": None}
+    return {"symbol": symbol.upper(), "status": "ok", "data": json.loads(cached)}
+
+
+@app.get("/news/{symbol}")
+def get_news(symbol: str, request: Request) -> dict:
+    """Return cached news articles for *symbol* from Redis."""
+    cached = request.app.state.redis.get(f"news_articles:{symbol.upper()}")
+    if not cached:
+        return {"symbol": symbol.upper(), "status": "not_cached", "data": None}
+    return {"symbol": symbol.upper(), "status": "ok", "data": json.loads(cached)}
+
+
+@app.post("/briefing/trigger")
+async def trigger_briefing() -> dict:
+    """Manually trigger the morning briefing — sends result to Telegram immediately."""
+    from agent.briefing import run_briefing
+    success = await run_briefing()
+    return {"triggered": True, "success": success}
 
 
 if __name__ == "__main__":

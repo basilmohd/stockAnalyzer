@@ -111,7 +111,23 @@ Week 3 COMPLETE ✓
 - Heartbeat job added (7AM daily)
 - Token cleanup job added (midnight daily)
 - 63/63 tests passing (11 week0 + 13 week1 + 13 week2 + 16 stoploss unit + 11 week3)
-Next: Week 4 — Technical indicators data pipeline (RSI, MACD, 200DMA)
+
+Week 4 COMPLETE ✓
+- data/technicals.py: IndicatorResult dataclass, fetch_ohlc, compute_indicators (pandas-ta), get_technicals_for_holdings
+- RSI-14, MACD 12/26/9, Bollinger Bands 20, SMA 50/200, volume ratio, 52w high/low computed for all holdings
+- data/news.py: get_news_sentiment with keyword-based scoring, mock+live mode, Redis cache (2h TTL)
+- Redis cache (1h TTL) for indicators, cache-aside pattern with graceful Redis fallback
+- 10/10 Week 4 tests passing
+
+Week 5 COMPLETE ✓
+- core/claude_client.py: call_claude_briefing wraps Anthropic API, _build_prompt, _parse_briefing_response
+- core/openai_client.py: call_openai_briefing wraps OpenAI GPT-4, reuses prompt/parser from claude_client
+- agent/briefing.py: generate_briefing (provider dispatch), run_briefing (format + send to Telegram)
+- scheduler.py: briefing_job wired at 08:30 IST Mon-Fri
+- webhook_server.py: POST /briefing/trigger for on-demand briefing without waiting for cron
+- AI_PROVIDER=claude/openai in .env, USE_MOCK_AI=true for tests
+- 92/93 tests passing (1 integration test skipped — placeholder ANTHROPIC_API_KEY in .env)
+Next: Week 6 — Signal generation (agent/signals.py)
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

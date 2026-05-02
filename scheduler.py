@@ -42,7 +42,9 @@ def market_day_check() -> bool:
 
 async def briefing_job() -> None:
     """Morning briefing: portfolio overview + overnight news digest."""
-    logger.info("briefing_job triggered")
+    from agent.briefing import run_briefing
+    result = await run_briefing()
+    logger.info("briefing_job complete (success=%s)", result)
 
 
 async def signal_job_am() -> None:
@@ -89,6 +91,24 @@ async def token_cleanup_job() -> None:
     """Midnight cleanup — expire stale approval tokens."""
     count = cleanup_expired_tokens()
     logger.info("token_cleanup_job: %d expired tokens cleaned up", count)
+
+
+async def refresh_technicals_job() -> None:
+    """Refresh technical indicators cache every 60 min, guarded to market hours."""
+    if not market_day_check():
+        return
+    from data.technicals import get_technicals_for_holdings
+    results = get_technicals_for_holdings()
+    logger.info("refresh_technicals_job: indicators refreshed for %d symbols", len(results))
+
+
+async def refresh_news_job() -> None:
+    """Refresh news sentiment cache every 120 min, guarded to market hours."""
+    if not market_day_check():
+        return
+    from data.news import get_news_sentiment_all_holdings
+    results = get_news_sentiment_all_holdings()
+    logger.info("refresh_news_job: news sentiment refreshed for %d symbols", len(results))
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -141,6 +161,14 @@ async def main() -> None:
     scheduler.add_job(
         token_cleanup_job, CronTrigger(hour=0, minute=0, timezone=IST),
         id="token_cleanup_job", name="Midnight Token Cleanup",
+    )
+    scheduler.add_job(
+        refresh_technicals_job, "interval", minutes=60,
+        id="refresh_technicals_job", name="Technicals Refresh (60min)",
+    )
+    scheduler.add_job(
+        refresh_news_job, "interval", minutes=120,
+        id="refresh_news_job", name="News Refresh (120min)",
     )
 
     scheduler.start()

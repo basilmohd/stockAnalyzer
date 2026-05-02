@@ -152,39 +152,84 @@ class KiteClient:
 
     # ── Trading ───────────────────────────────────────────────────────────────
 
-    def place_order(
-        self,
-        tradingsymbol: str,
-        exchange: str,
-        transaction_type: str,
-        quantity: int,
-        order_type: str,
-        product: str = "CNC",
-        price: Optional[float] = None,
-    ) -> dict:
-        """Place a CNC order. Returns dict with order_id and status."""
+    def place_order(self, symbol: str, action: str, quantity: int) -> dict:
+        """Place a CNC MARKET order for a signal. action: BUY/SELL/REDUCE/EXIT.
+
+        Never raises — returns error dict on failure.
+        Mock: returns MOCK-{symbol}-{timestamp} order_id.
+        Real: REDUCE sells 50% of current holdings; EXIT sells all.
+        """
+        import time as _time
         try:
+            if not symbol or quantity <= 0:
+                return {
+                    "order_id": None,
+                    "status": "FAILED",
+                    "error": f"Invalid params: symbol={symbol!r}, quantity={quantity}",
+                }
+
+            logger.info(
+                "place_order: symbol=%s action=%s qty=%d mock=%s",
+                symbol, action, quantity, self.mock,
+            )
+
             if self.mock:
-                logger.info(
-                    "MOCK place_order: %s %s %s x%d @ %s (product=%s)",
-                    transaction_type, tradingsymbol, exchange, quantity, price, product,
-                )
-                return {"order_id": "MOCK_ORD_123", "status": "success"}
+                order_id = f"MOCK-{symbol}-{int(_time.time())}"
+                logger.info("Mock order placed: %s", order_id)
+                return {
+                    "order_id": order_id,
+                    "status": "COMPLETE",
+                    "symbol": symbol,
+                    "action": action,
+                    "quantity": quantity,
+                }
 
             from kiteconnect import KiteConnect
-            params: dict = {
-                "tradingsymbol":    tradingsymbol,
-                "exchange":         exchange,
-                "transaction_type": transaction_type,
-                "quantity":         quantity,
-                "order_type":       order_type,
-                "product":          product,
-                "variety":          KiteConnect.VARIETY_REGULAR,
+
+            action_upper = action.upper()
+            if action_upper == "BUY":
+                transaction_type = KiteConnect.TRANSACTION_TYPE_BUY
+                actual_qty = quantity
+            elif action_upper in ("SELL", "REDUCE", "EXIT"):
+                transaction_type = KiteConnect.TRANSACTION_TYPE_SELL
+                actual_qty = quantity
+                if action_upper in ("REDUCE", "EXIT"):
+                    holdings = self.get_holdings()
+                    holding = next(
+                        (h for h in holdings if h["tradingsymbol"] == symbol), None
+                    )
+                    if holding:
+                        if action_upper == "EXIT":
+                            actual_qty = holding["quantity"]
+                        else:
+                            actual_qty = max(1, holding["quantity"] // 2)
+            else:
+                return {
+                    "order_id": None,
+                    "status": "FAILED",
+                    "error": f"Unknown action: {action}",
+                }
+
+            kite_order_id = self.kite.place_order(
+                tradingsymbol=symbol,
+                exchange="NSE",
+                transaction_type=transaction_type,
+                quantity=actual_qty,
+                order_type=KiteConnect.ORDER_TYPE_MARKET,
+                product=KiteConnect.PRODUCT_CNC,
+                variety=KiteConnect.VARIETY_REGULAR,
+            )
+
+            return {
+                "order_id": str(kite_order_id),
+                "status": "COMPLETE",
+                "symbol": symbol,
+                "action": action,
+                "quantity": actual_qty,
             }
-            if price and order_type == "LIMIT":
-                params["price"] = price
-            order_id = self.kite.place_order(**params)
-            return {"order_id": order_id, "status": "success"}
         except Exception as exc:
-            logger.error("place_order error: %s", exc)
-            raise
+            logger.error(
+                "place_order failed: symbol=%s action=%s qty=%d: %s",
+                symbol, action, quantity, exc,
+            )
+            return {"order_id": None, "status": "FAILED", "error": str(exc)}

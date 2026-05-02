@@ -85,6 +85,22 @@ async def trigger_briefing() -> dict:
     return {"triggered": True, "success": success}
 
 
+@app.post("/signals/trigger")
+async def trigger_signals() -> dict:
+    """Manually trigger the signal pipeline — returns summary dict."""
+    from agent.signals import run_signal_pipeline
+    return await run_signal_pipeline()
+
+
+@app.get("/signals/latest")
+def signals_latest(request: Request) -> dict:
+    """Return the cached result of the last signal pipeline run from Redis."""
+    cached = request.app.state.redis.get("signals:last_run")
+    if not cached:
+        return {"status": "not_run", "data": None}
+    return {"status": "ok", "data": json.loads(cached)}
+
+
 if __name__ == "__main__":
     import uvicorn
 

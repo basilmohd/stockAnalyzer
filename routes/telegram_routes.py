@@ -55,16 +55,23 @@ async def telegram_webhook(request: Request) -> dict:
                     alert_type="SUCCESS",
                 )
 
+        elif action == "execute":
+            await _answer_callback_query(query_id, "⚙️ Placing order…")
+            from routes.approval_routes import handle_signal_execution
+            order_result = await handle_signal_execution(token)
+            if order_result.get("status") != "ok":
+                logger.warning("Signal execution failed: %s", order_result.get("reason"))
+
         elif action == "skip":
             result = validate_token(token)
             if not result["valid"]:
                 await _answer_callback_query(query_id, f"❌ {result['reason']}")
             else:
                 mark_skipped(token)
-                await _answer_callback_query(query_id, "⏸ Skipped. Signal logged.")
+                await _answer_callback_query(query_id, "⏭ Skipped.")
                 await send_alert(
                     "Signal Skipped",
-                    f"Token {token[:8]}... skipped by user.",
+                    f"Signal {token[:8]}… skipped by user.",
                     alert_type="INFO",
                 )
 

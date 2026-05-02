@@ -49,7 +49,9 @@ async def briefing_job() -> None:
 
 async def signal_job_am() -> None:
     """Mid-morning signal scan (11:00 AM IST)."""
-    logger.info("signal_job_am triggered")
+    from agent.signals import run_signal_pipeline
+    summary = await run_signal_pipeline()
+    logger.info("signal_job_am complete: %s", summary)
 
 
 async def scanner_job() -> None:
@@ -59,7 +61,9 @@ async def scanner_job() -> None:
 
 async def signal_job_pm() -> None:
     """Afternoon signal scan (2:00 PM IST)."""
-    logger.info("signal_job_pm triggered")
+    from agent.signals import run_signal_pipeline
+    summary = await run_signal_pipeline()
+    logger.info("signal_job_pm complete: %s", summary)
 
 
 async def post_market_job() -> None:

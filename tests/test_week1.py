@@ -58,11 +58,12 @@ def test_kite_client_get_quote():
 # ── 5. Order placement ────────────────────────────────────────────────────────
 
 def test_kite_client_place_order_mock():
-    """Mock place_order returns order_id and status == 'success'."""
+    """Mock place_order(symbol, action, qty) returns order_id containing 'MOCK'."""
     from core.kite_client import KiteClient
-    result = KiteClient().place_order("ICICIBANK", "NSE", "BUY", 10, "LIMIT", "CNC", 1160.0)
+    result = KiteClient().place_order("ICICIBANK", "BUY", 10)
     assert "order_id" in result
-    assert result["status"] == "success"
+    assert result["order_id"] is not None
+    assert "MOCK" in result["order_id"]
 
 
 # ── 6. Portfolio summary ──────────────────────────────────────────────────────

@@ -101,7 +101,17 @@ Week 2 COMPLETE ✓
 - Callback handler wired in telegram_routes.py
 - Tested live on phone: briefing, SL alert, signal alert, health report all received
 - 37/37 tests passing
-Next: Week 3 — Stop-loss monitor (first real protection module)
+
+Week 3 COMPLETE ✓
+- Stop-loss monitor built — checks all 20+ holdings
+- Rule-based: no Claude API, pure Python math
+- Cooldown system prevents duplicate alerts (30 min)
+- ngrok tunnel working — Telegram buttons respond correctly
+- Full SL breach simulation tested end-to-end on phone
+- Heartbeat job added (7AM daily)
+- Token cleanup job added (midnight daily)
+- 63/63 tests passing (11 week0 + 13 week1 + 13 week2 + 16 stoploss unit + 11 week3)
+Next: Week 4 — Technical indicators data pipeline (RSI, MACD, 200DMA)
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

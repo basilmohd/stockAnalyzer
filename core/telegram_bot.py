@@ -38,6 +38,54 @@ def get_bot() -> Bot:
     return Bot(token=TELEGRAM_BOT_TOKEN)
 
 
+async def set_webhook(public_url: str) -> bool:
+    """Register public_url/telegram/webhook as the Telegram webhook URL.
+
+    Returns True on success, False on error.
+    """
+    try:
+        bot = get_bot()
+        await bot.set_webhook(url=f"{public_url}/telegram/webhook")
+        logger.info("Telegram webhook set to: %s/telegram/webhook", public_url)
+        return True
+    except Exception as exc:
+        logger.error("set_webhook failed: %s", exc)
+        return False
+
+
+async def delete_webhook() -> bool:
+    """Remove the registered Telegram webhook (reverts to polling mode).
+
+    Returns True on success, False on error.
+    """
+    try:
+        bot = get_bot()
+        await bot.delete_webhook()
+        logger.info("Telegram webhook deleted — polling mode")
+        return True
+    except Exception as exc:
+        logger.error("delete_webhook failed: %s", exc)
+        return False
+
+
+async def get_webhook_info() -> dict:
+    """Return current webhook registration details from Telegram.
+
+    Keys: url, has_custom_certificate, pending_update_count
+    """
+    try:
+        bot = get_bot()
+        info = await bot.get_webhook_info()
+        return {
+            "url": info.url,
+            "has_custom_certificate": info.has_custom_certificate,
+            "pending_update_count": info.pending_update_count,
+        }
+    except Exception as exc:
+        logger.error("get_webhook_info failed: %s", exc)
+        return {}
+
+
 async def send_message(text: str, parse_mode: str = "HTML") -> bool:
     """Send a plain text message to the configured chat.
 

@@ -118,7 +118,16 @@ Week 4 COMPLETE ✓
 - data/news.py: get_news_sentiment with keyword-based scoring, mock+live mode, Redis cache (2h TTL)
 - Redis cache (1h TTL) for indicators, cache-aside pattern with graceful Redis fallback
 - 10/10 Week 4 tests passing
-Next: Week 5 — Agent briefing (agent/briefing.py)
+
+Week 5 COMPLETE ✓
+- core/claude_client.py: call_claude_briefing wraps Anthropic API, _build_prompt, _parse_briefing_response
+- core/openai_client.py: call_openai_briefing wraps OpenAI GPT-4, reuses prompt/parser from claude_client
+- agent/briefing.py: generate_briefing (provider dispatch), run_briefing (format + send to Telegram)
+- scheduler.py: briefing_job wired at 08:30 IST Mon-Fri
+- webhook_server.py: POST /briefing/trigger for on-demand briefing without waiting for cron
+- AI_PROVIDER=claude/openai in .env, USE_MOCK_AI=true for tests
+- 92/93 tests passing (1 integration test skipped — placeholder ANTHROPIC_API_KEY in .env)
+Next: Week 6 — Signal generation (agent/signals.py)
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

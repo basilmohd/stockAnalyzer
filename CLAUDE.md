@@ -111,7 +111,14 @@ Week 3 COMPLETE ✓
 - Heartbeat job added (7AM daily)
 - Token cleanup job added (midnight daily)
 - 63/63 tests passing (11 week0 + 13 week1 + 13 week2 + 16 stoploss unit + 11 week3)
-Next: Week 4 — Technical indicators data pipeline (RSI, MACD, 200DMA)
+
+Week 4 COMPLETE ✓
+- data/technicals.py: IndicatorResult dataclass, fetch_ohlc, compute_indicators (pandas-ta), get_technicals_for_holdings
+- RSI-14, MACD 12/26/9, Bollinger Bands 20, SMA 50/200, volume ratio, 52w high/low computed for all holdings
+- data/news.py: get_news_sentiment with keyword-based scoring, mock+live mode, Redis cache (2h TTL)
+- Redis cache (1h TTL) for indicators, cache-aside pattern with graceful Redis fallback
+- 10/10 Week 4 tests passing
+Next: Week 5 — Agent briefing (agent/briefing.py)
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

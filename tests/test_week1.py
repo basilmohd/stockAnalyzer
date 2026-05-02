@@ -122,10 +122,10 @@ def test_compute_indicators():
     from data.technicals import fetch_ohlc, compute_indicators
     df = fetch_ohlc("ICICIBANK", 408065)
     result = compute_indicators(df)
-    assert "rsi" in result
-    assert 0 < result["rsi"] < 100
-    assert isinstance(result["above_200sma"], bool)
-    assert result["volume_ratio"] > 0
+    assert hasattr(result, "rsi")
+    assert 0 < result.rsi < 100
+    assert isinstance(result.above_200sma, bool)
+    assert result.volume_ratio > 0
 
 
 # ── 11. Technicals for all holdings ──────────────────────────────────────────
@@ -136,7 +136,7 @@ def test_get_technicals_for_holdings():
     result = get_technicals_for_holdings()
     assert len(result) == 8
     assert "ICICIBANK" in result
-    assert "rsi" in result["ICICIBANK"]
+    assert hasattr(result["ICICIBANK"], "rsi")
 
 
 # ── 12. Kite login endpoint ───────────────────────────────────────────────────

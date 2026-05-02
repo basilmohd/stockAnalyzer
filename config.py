@@ -40,3 +40,8 @@ SL_COOLDOWN_MINS = 30          # Don't re-alert same stock within 30 min
 
 # ── Per-stock SL overrides (symbol: pct) ─────────────────────────────────────
 SL_OVERRIDES: dict[str, float] = {}
+
+AI_PROVIDER = os.getenv("AI_PROVIDER", "claude").lower()  # "claude" or "openai"
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")

@@ -4,7 +4,6 @@ Runs all timed market jobs. Never import webhook_server here.
 Run: python scheduler.py
 """
 import asyncio
-import logging
 from datetime import datetime
 
 import pytz
@@ -13,20 +12,15 @@ from apscheduler.triggers.cron import CronTrigger
 
 from config import REDIS_URL, TIMEZONE
 from core.db import init_db
+from core.exception_handler import safe_run
+from core.logger import get_logger
 from core.redis_client import RedisClient
-from core.telegram_bot import send_message
-from core.approval import cleanup_expired_tokens
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
-)
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 IST = pytz.timezone(TIMEZONE)
 
 
-# ── Market guard ─────────────────────────────────────────────────────────────
+# ── Market guard ──────────────────────────────────────────────────────────────
 
 def market_day_check() -> bool:
     """Return True only during NSE trading hours on a weekday."""
@@ -38,87 +32,76 @@ def market_day_check() -> bool:
     return market_open <= now <= market_close
 
 
-# ── Job stubs ─────────────────────────────────────────────────────────────────
-
-async def briefing_job() -> None:
-    """Morning briefing: portfolio overview + overnight news digest."""
-    from agent.briefing import run_briefing
-    result = await run_briefing()
-    logger.info("briefing_job complete (success=%s)", result)
-
-
-async def signal_job_am() -> None:
-    """Mid-morning signal scan (11:00 AM IST)."""
-    from agent.signals import run_signal_pipeline
-    summary = await run_signal_pipeline()
-    logger.info("signal_job_am complete: %s", summary)
-
-
-async def scanner_job() -> None:
-    """Nifty 200 opportunity scanner (12:30 PM IST)."""
-    logger.info("scanner_job triggered")
-
-
-async def signal_job_pm() -> None:
-    """Afternoon signal scan (2:00 PM IST)."""
-    from agent.signals import run_signal_pipeline
-    summary = await run_signal_pipeline()
-    logger.info("signal_job_pm complete: %s", summary)
-
-
-async def post_market_job() -> None:
-    """Post-market summary and portfolio snapshot (4:00 PM IST)."""
-    logger.info("post_market_job triggered")
-
-
-async def health_job() -> None:
-    """Weekly system health report (Sunday 7:00 PM IST)."""
-    logger.info("health_job triggered")
-
-
-async def stoploss_job() -> None:
-    """Stop-loss monitor — runs every 5 min, guarded to market hours."""
-    from agent.stoploss import run_with_market_check
-    results = await run_with_market_check()
-    if results:
-        logger.info("SL job complete: %s", results)
-
+# ── Scheduled job wrappers ────────────────────────────────────────────────────
 
 async def heartbeat_job() -> None:
-    """Daily liveness ping at 07:00 IST Mon–Fri."""
-    today = datetime.now(IST).strftime("%Y-%m-%d")
-    await send_message(f"🤖 Portfolio Agent alive — {today}\nNext: Kite auth reminder at 8:00 AM")
-    logger.info("heartbeat_job: ping sent")
+    """Daily liveness ping at 07:00 IST."""
+    from core.heartbeat import send_heartbeat
+    await safe_run("heartbeat", send_heartbeat)
 
 
-async def token_cleanup_job() -> None:
-    """Midnight cleanup — expire stale approval tokens."""
-    count = cleanup_expired_tokens()
-    logger.info("token_cleanup_job: %d expired tokens cleaned up", count)
+async def morning_briefing_job() -> None:
+    """Morning briefing: portfolio overview + overnight news digest (08:30 Mon–Fri)."""
+    from agent.briefing import run_briefing
+    await safe_run("morning_briefing", run_briefing)
+
+
+async def sl_monitor_job() -> None:
+    """Stop-loss monitor — runs every 5 min, guarded to market hours."""
+    from agent.stoploss import run_with_market_check
+    await safe_run("sl_monitor", run_with_market_check)
 
 
 async def refresh_technicals_job() -> None:
-    """Refresh technical indicators cache every 60 min, guarded to market hours."""
+    """Refresh technical indicators cache every 60 min (market hours only)."""
     if not market_day_check():
         return
     from data.technicals import get_technicals_for_holdings
-    results = get_technicals_for_holdings()
-    logger.info("refresh_technicals_job: indicators refreshed for %d symbols", len(results))
+    await safe_run("refresh_technicals", get_technicals_for_holdings)
 
 
 async def refresh_news_job() -> None:
-    """Refresh news sentiment cache every 120 min, guarded to market hours."""
+    """Refresh news sentiment cache every 120 min (market hours only)."""
     if not market_day_check():
         return
     from data.news import get_news_sentiment_all_holdings
-    results = get_news_sentiment_all_holdings()
-    logger.info("refresh_news_job: news sentiment refreshed for %d symbols", len(results))
+    await safe_run("refresh_news", get_news_sentiment_all_holdings)
+
+
+async def signal_scan_morning_job() -> None:
+    """Mid-morning signal scan (11:00 AM IST Mon–Fri)."""
+    from agent.signals import run_signal_pipeline
+    await safe_run("signal_scan_morning", run_signal_pipeline)
+
+
+async def signal_scan_afternoon_job() -> None:
+    """Afternoon signal scan (2:00 PM IST Mon–Fri)."""
+    from agent.signals import run_signal_pipeline
+    await safe_run("signal_scan_afternoon", run_signal_pipeline)
+
+
+async def opportunity_scan_job() -> None:
+    """Nifty 200 opportunity scanner (10:00 AM IST Mon–Fri)."""
+    from agent.scanner import send_opportunity_alerts
+    await safe_run("opportunity_scan", send_opportunity_alerts)
+
+
+async def weekly_health_job() -> None:
+    """Weekly portfolio health report (Sunday 09:00 IST)."""
+    from agent.health import send_weekly_health_report
+    await safe_run("weekly_health", send_weekly_health_report)
+
+
+async def token_cleanup_job() -> None:
+    """Midnight cleanup — expire stale approval tokens (00:00 daily)."""
+    from core.approval import cleanup_expired_tokens
+    await safe_run("token_cleanup", cleanup_expired_tokens)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def main() -> None:
-    """Initialise services, register all jobs, and run forever."""
+    """Initialise services, register all 10 jobs, and run forever."""
     logger.info("Starting Portfolio Agent — Scheduler")
 
     redis = RedisClient(REDIS_URL)
@@ -126,66 +109,77 @@ async def main() -> None:
 
     token = redis.get("kite:access_token")
     if not token:
-        logger.warning("Warning: No Kite auth token found. Send auth link first.")
+        logger.warning("No Kite auth token found. Send auth link first.")
 
     scheduler = AsyncIOScheduler(timezone=IST)
 
+    # ── 10-job schedule ───────────────────────────────────────────────────────
     scheduler.add_job(
-        briefing_job, CronTrigger(hour=8, minute=30, day_of_week="mon-fri", timezone=IST),
-        id="briefing_job", name="Morning Briefing",
+        heartbeat_job,
+        CronTrigger(hour=7, minute=0, timezone=IST),
+        id="heartbeat", name="Daily Heartbeat",
     )
     scheduler.add_job(
-        signal_job_am, CronTrigger(hour=11, minute=0, day_of_week="mon-fri", timezone=IST),
-        id="signal_job_am", name="AM Signal Scan",
+        morning_briefing_job,
+        CronTrigger(hour=8, minute=30, day_of_week="mon-fri", timezone=IST),
+        id="morning_briefing", name="Morning Briefing",
     )
     scheduler.add_job(
-        scanner_job, CronTrigger(hour=12, minute=30, day_of_week="mon-fri", timezone=IST),
-        id="scanner_job", name="Nifty200 Scanner",
+        sl_monitor_job,
+        "interval", minutes=5,
+        id="sl_monitor", name="SL Monitor (5min)",
     )
     scheduler.add_job(
-        signal_job_pm, CronTrigger(hour=14, minute=0, day_of_week="mon-fri", timezone=IST),
-        id="signal_job_pm", name="PM Signal Scan",
+        refresh_technicals_job,
+        "interval", minutes=60,
+        id="refresh_technicals", name="Technicals Refresh (60min)",
     )
     scheduler.add_job(
-        post_market_job, CronTrigger(hour=16, minute=0, day_of_week="mon-fri", timezone=IST),
-        id="post_market_job", name="Post-Market Summary",
+        refresh_news_job,
+        "interval", minutes=120,
+        id="refresh_news", name="News Refresh (120min)",
     )
     scheduler.add_job(
-        health_job, CronTrigger(hour=19, minute=0, day_of_week="sun", timezone=IST),
-        id="health_job", name="Weekly Health Report",
+        signal_scan_morning_job,
+        CronTrigger(hour=11, minute=0, day_of_week="mon-fri", timezone=IST),
+        id="signal_scan_morning", name="AM Signal Scan",
     )
     scheduler.add_job(
-        stoploss_job, "interval", minutes=5,
-        id="stoploss_job", name="SL Monitor (5min)",
+        signal_scan_afternoon_job,
+        CronTrigger(hour=14, minute=0, day_of_week="mon-fri", timezone=IST),
+        id="signal_scan_afternoon", name="PM Signal Scan",
     )
     scheduler.add_job(
-        heartbeat_job, CronTrigger(hour=7, minute=0, day_of_week="mon-fri", timezone=IST),
-        id="heartbeat_job", name="Daily Heartbeat",
+        opportunity_scan_job,
+        CronTrigger(hour=10, minute=0, day_of_week="mon-fri", timezone=IST),
+        id="opportunity_scan", name="Opportunity Scanner",
     )
     scheduler.add_job(
-        token_cleanup_job, CronTrigger(hour=0, minute=0, timezone=IST),
-        id="token_cleanup_job", name="Midnight Token Cleanup",
+        weekly_health_job,
+        CronTrigger(hour=9, minute=0, day_of_week="sun", timezone=IST),
+        id="weekly_health", name="Weekly Health Report",
     )
     scheduler.add_job(
-        refresh_technicals_job, "interval", minutes=60,
-        id="refresh_technicals_job", name="Technicals Refresh (60min)",
-    )
-    scheduler.add_job(
-        refresh_news_job, "interval", minutes=120,
-        id="refresh_news_job", name="News Refresh (120min)",
+        token_cleanup_job,
+        CronTrigger(hour=0, minute=0, timezone=IST),
+        id="token_cleanup", name="Midnight Token Cleanup",
     )
 
     scheduler.start()
     logger.info("Scheduler ready — %d jobs registered:", len(scheduler.get_jobs()))
 
     for job in scheduler.get_jobs():
-        next_run = job.next_run_time.astimezone(IST).strftime("%Y-%m-%d %H:%M:%S %Z") if job.next_run_time else "N/A"
-        logger.info("  %-28s  next: %s", job.name, next_run)
+        next_run = (
+            job.next_run_time.astimezone(IST).strftime("%Y-%m-%d %H:%M:%S %Z")
+            if job.next_run_time
+            else "N/A"
+        )
+        logger.info("  %-30s  next: %s", job.name, next_run)
 
-    # Startup SL check — runs immediately regardless of market hours for boot-time validation
+    # Boot-time SL check for immediate validation
     logger.info("Running startup SL check...")
     from agent.stoploss import run_sl_monitor
-    startup_results = await run_sl_monitor()
+    startup_results = await safe_run("startup_sl_check", run_sl_monitor)
     logger.info("Startup SL check complete: %s", startup_results)
 
     await asyncio.get_event_loop().create_future()  # run forever

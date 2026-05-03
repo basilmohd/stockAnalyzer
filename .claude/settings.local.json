@@ -19,7 +19,15 @@
       "Bash(where python *)",
       "Bash(pip list *)",
       "Bash(py -3 -c ' *)",
-      "Bash(py -3 -m pip install python-telegram-bot)"
+      "Bash(py -3 -m pip install python-telegram-bot)",
+      "PowerShell(pip *)",
+      "PowerShell(winget *)",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\CoreX\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Basil-Projects-stockAnalyzer\\\\22757978-fcd4-444a-a561-05e5d032869c\\\\tasks\\\\b9dh5jp37.output\" -Raw | Select-String \"Successfully.{0,60}\" | ForEach-Object { $_.Matches[0].Value })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\CoreX\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Basil-Projects-stockAnalyzer\\\\22757978-fcd4-444a-a561-05e5d032869c\\\\tasks\\\\b9dh5jp37.output\" -Raw; Write-Output \"Total chars: $\\($content.Length\\)\"; $lines = $content -split \"`n\"; Write-Output \"Total lines: $\\($lines.Count\\)\"; $lines | Select-Object -Last 5 | ForEach-Object { Write-Output \"LINE: $_\" })",
+      "PowerShell(Get-Process *326)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); python --version 2>&1; python3 --version 2>&1)",
+      "Bash(pip show *)",
+      "Bash(pip index *)"
     ]
   }
 }

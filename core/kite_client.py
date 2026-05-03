@@ -2,7 +2,6 @@
 Kite Connect wrapper. Delegates to MockKiteClient when USE_MOCK=true,
 or to the real KiteConnect SDK when USE_MOCK=false.
 """
-import logging
 from datetime import datetime
 from typing import Optional
 
@@ -14,7 +13,8 @@ from config import (
 )
 from core.redis_client import RedisClient
 
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+logger = get_logger(__name__)
 
 _redis = RedisClient(REDIS_URL)
 

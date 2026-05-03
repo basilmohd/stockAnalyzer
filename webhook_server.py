@@ -101,6 +101,38 @@ def signals_latest(request: Request) -> dict:
     return {"status": "ok", "data": json.loads(cached)}
 
 
+@app.post("/scanner/trigger")
+async def trigger_scanner() -> dict:
+    """Manually trigger the opportunity scanner — sends Telegram alerts, returns summary."""
+    from agent.scanner import send_opportunity_alerts
+    return await send_opportunity_alerts()
+
+
+@app.post("/health/trigger")
+async def trigger_health() -> dict:
+    """Manually trigger the weekly health report — sends to Telegram, returns health dict."""
+    from agent.health import compute_health_score, send_weekly_health_report
+    await send_weekly_health_report()
+    from agent.health import compute_health_score
+    return compute_health_score()
+
+
+@app.get("/health/latest")
+def health_latest() -> dict:
+    """Return the latest PortfolioSnapshot health score from SQLite."""
+    from core.db import get_db
+    from models.portfolio_snap import PortfolioSnapshot
+    with get_db() as db:
+        snap = (
+            db.query(PortfolioSnapshot)
+            .order_by(PortfolioSnapshot.id.desc())
+            .first()
+        )
+    if not snap:
+        return {"status": "no_data", "data": None}
+    return {"status": "ok", "data": json.loads(snap.health_score_json)}
+
+
 if __name__ == "__main__":
     import uvicorn
 

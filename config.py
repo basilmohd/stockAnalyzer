@@ -41,8 +41,16 @@ SL_COOLDOWN_MINS = 30          # Don't re-alert same stock within 30 min
 # ── Per-stock SL overrides (symbol: pct) ─────────────────────────────────────
 SL_OVERRIDES: dict[str, float] = {}
 
+# ── Scanner ───────────────────────────────────────────────────────────────────
+MAX_OPPORTUNITIES_PER_DAY = 2  # Cap on opportunity alerts per scanner run
+
 AI_PROVIDER = os.getenv("AI_PROVIDER", "claude").lower()  # "claude" or "openai"
 USE_MOCK_AI = os.getenv("USE_MOCK_AI", "true").lower() == "true"
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOG_ROTATION = "midnight"
+LOG_BACKUP_COUNT = 7  # keep 1 week of logs

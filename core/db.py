@@ -34,6 +34,18 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _add_column_if_missing(table: str, column: str, col_def: str) -> None:
+    """Add a column to a SQLite table if it doesn't already exist."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    existing = [c["name"] for c in inspector.get_columns(table)]
+    if column not in existing:
+        with engine.connect() as conn:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_def}"))
+            conn.commit()
+        logger.info("Migrated: added %s.%s", table, column)
+
+
 def init_db() -> None:
     """Create all tables defined on Base. Safe to call on every startup."""
     # Import all models so SQLAlchemy registers them before create_all resolves FKs.
@@ -43,4 +55,5 @@ def init_db() -> None:
     import models.portfolio_snap  # noqa: F401
 
     Base.metadata.create_all(engine)
+    _add_column_if_missing("portfolio_snapshots", "health_score_json", "health_score_json TEXT")
     logger.info("Database initialised")

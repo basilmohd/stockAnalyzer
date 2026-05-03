@@ -1,5 +1,4 @@
 """Morning briefing agent — gathers portfolio/technicals/news and sends AI analysis."""
-import logging
 from datetime import datetime
 
 import pytz
@@ -10,7 +9,8 @@ from data.news import get_news_sentiment_all_holdings
 from data.portfolio import build_claude_context
 from data.technicals import get_technicals_for_holdings
 
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+logger = get_logger(__name__)
 
 IST = pytz.timezone(config.TIMEZONE)
 

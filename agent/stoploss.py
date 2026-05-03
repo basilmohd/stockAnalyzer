@@ -16,7 +16,8 @@ from data.portfolio import get_holdings_with_sl_status
 from config import REDIS_URL, MARKET_OPEN, MARKET_CLOSE
 
 IST = ZoneInfo(TIMEZONE)
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+logger = get_logger(__name__)
 
 _redis = RedisClient(REDIS_URL)
 

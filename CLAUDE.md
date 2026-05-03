@@ -139,6 +139,18 @@ Week 6 COMPLETE ✓
 - tests/test_week6.py: 13 new tests covering signal generation, order placement, and approval flow
 - 83/83 tests passing
 
+Week 7 COMPLETE ✓ — MVP1 DONE
+- core/exception_handler.py: safe_run() wraps all jobs — catches exceptions, logs full traceback, sends Telegram ⚠️ alert (non-blocking), returns None
+- core/heartbeat.py: send_heartbeat() collects Redis/DB status, last SL check, last briefing timestamp → sends formatted daily status to Telegram
+- core/logger.py: get_logger(__name__) factory — midnight-rotating file handler (7-day retention) + stream handler; used in all agent + core modules
+- config.py: LOG_LEVEL, LOG_ROTATION, LOG_BACKUP_COUNT added
+- scheduler.py: final 10-job table (heartbeat daily, briefing/signals/opportunity Mon-Fri, health Sunday, sl+technicals+news interval, token cleanup midnight); ALL wrapped in safe_run()
+- webhook_server.py: POST /scanner/trigger, POST /health/trigger, GET /health/latest debug endpoints added
+- agent/health.py: data.technicals import made lazy to avoid top-level pandas_ta load at import time
+- All 8 modules updated to use get_logger(__name__): agent/stoploss, briefing, signals, scanner, health; core/claude_client, kite_client
+- tests/test_week7.py: 13 new tests — screener filters, opportunity scan, health score, safe_run
+- 118/119 tests passing (1 skipped — placeholder ANTHROPIC_API_KEY integration test)
+
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday
 - Exchange: NSE

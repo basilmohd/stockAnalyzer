@@ -1,10 +1,9 @@
 """Claude AI client for portfolio briefing analysis."""
 import json
-import logging
-
 import config
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def call_claude_briefing(

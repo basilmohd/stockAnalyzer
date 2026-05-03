@@ -1,6 +1,5 @@
 """Signal generation engine — AI-driven BUY/SELL/REDUCE/EXIT for NSE holdings."""
 import json
-import logging
 from datetime import datetime
 
 import config
@@ -13,7 +12,8 @@ from data.portfolio import build_claude_context
 from data.technicals import get_technicals_for_holdings
 from models.signal import Signal
 
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+logger = get_logger(__name__)
 _redis = RedisClient(config.REDIS_URL)
 
 _ACTION_EMOJI: dict[str, str] = {

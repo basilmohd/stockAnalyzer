@@ -127,7 +127,17 @@ Week 5 COMPLETE ✓
 - webhook_server.py: POST /briefing/trigger for on-demand briefing without waiting for cron
 - AI_PROVIDER=claude/openai in .env, USE_MOCK_AI=true for tests
 - 92/93 tests passing (1 integration test skipped — placeholder ANTHROPIC_API_KEY in .env)
-Next: Week 6 — Signal generation (agent/signals.py)
+
+Week 6 COMPLETE ✓
+- agent/signals.py: full signal pipeline — scan holdings → filter by confidence threshold → store to SQLite → send Telegram alert with EXECUTE/SKIP buttons
+- core/claude_client.py: generate_signals() added — Claude analyzes technicals + news and returns structured signal list
+- core/kite_client.py: place_order() added with mock + live mode (CNC product type, NSE exchange)
+- routes/approval_routes.py: handle_signal_execution() wired — on approval, places order via Kite
+- routes/telegram_routes.py: EXECUTE/SKIP callback handlers for signal action buttons
+- scheduler.py: signal_job wired at 11:00 AM and 2:00 PM IST Mon-Fri
+- webhook_server.py: POST /signals/trigger (on-demand) and GET /signals/latest endpoints added
+- tests/test_week6.py: 13 new tests covering signal generation, order placement, and approval flow
+- 83/83 tests passing
 
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday

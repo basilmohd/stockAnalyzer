@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 
-from config import USE_MOCK, REDIS_URL
+from config import USE_MOCK, USE_MOCK_KITE, REDIS_URL
 from core.db import init_db
 from core.redis_client import RedisClient
 from routes.approval_routes import router as approval_router
@@ -54,7 +54,7 @@ def health() -> dict:
     """Liveness check used by EC2 / load balancer health checks."""
     return {
         "status": "ok",
-        "mode": "mock" if USE_MOCK else "live",
+        "mode": "mock" if USE_MOCK_KITE else "live",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

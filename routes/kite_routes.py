@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-from config import USE_MOCK, REDIS_URL
+from config import USE_MOCK, USE_MOCK_KITE, REDIS_URL
 from core.kite_client import KiteClient
 from core.redis_client import RedisClient
 
@@ -43,7 +43,7 @@ async def kite_oauth_callback(
     """
     try:
         token = request_token
-        if USE_MOCK and not token:
+        if USE_MOCK_KITE and not token:
             token = "mock_request_token"
 
         KiteClient().generate_session(token)
@@ -72,6 +72,6 @@ async def kite_status() -> dict:
 
     return {
         "authenticated": authenticated,
-        "mode": "mock" if USE_MOCK else "live",
+        "mode": "mock" if USE_MOCK_KITE else "live",
         "token_ttl_seconds": ttl,
     }

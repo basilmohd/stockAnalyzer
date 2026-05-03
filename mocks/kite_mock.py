@@ -1,4 +1,4 @@
-"""Mock Kite Connect client for local development (USE_MOCK=true)."""
+"""Mock Kite Connect client for local development (USE_MOCK_KITE=true)."""
 
 import random
 from datetime import datetime, timedelta
@@ -6,31 +6,38 @@ from typing import Any
 
 
 _HOLDINGS_DATA = [
-    {"tradingsymbol": "ICICIBANK",  "qty": 50,  "avg_price": 1140.50, "last_price": 1162.30, "instrument_token": 1270529},
-    {"tradingsymbol": "INFY",       "qty": 30,  "avg_price": 1580.00, "last_price": 1541.20, "instrument_token": 408065},
-    {"tradingsymbol": "HDFCBANK",   "qty": 40,  "avg_price": 1620.75, "last_price": 1678.90, "instrument_token": 341249},
-    {"tradingsymbol": "BHARTIARTL", "qty": 25,  "avg_price": 1380.00, "last_price": 1445.60, "instrument_token": 2714625},
-    {"tradingsymbol": "APOLLOHOSP", "qty": 10,  "avg_price": 6820.00, "last_price": 7102.50, "instrument_token": 4343041},
-    {"tradingsymbol": "TATAMOTORS", "qty": 60,  "avg_price": 780.25,  "last_price": 712.40,  "instrument_token": 884737},
-    {"tradingsymbol": "SUNPHARMA",  "qty": 35,  "avg_price": 1720.00, "last_price": 1798.30, "instrument_token": 857857},
-    {"tradingsymbol": "PFC",        "qty": 100, "avg_price": 480.50,  "last_price": 412.80,  "instrument_token": 4592641},
+    # symbol         qty    avg_price   last_price   instrument_token
+    {"tradingsymbol": "IRCTC",      "qty": 119, "avg_price":   365.28, "last_price":   539.55, "instrument_token": 3484417},
+    {"tradingsymbol": "POLYCAB",    "qty":   5, "avg_price":  2402.43, "last_price":  8110.50, "instrument_token": 4152833},
+    {"tradingsymbol": "RELIANCE",   "qty":  24, "avg_price":   960.03, "last_price":  1430.80, "instrument_token": 738561},
+    {"tradingsymbol": "OLECTRA",    "qty":  27, "avg_price":   414.41, "last_price":  1245.60, "instrument_token": 969473},
+    {"tradingsymbol": "MARUTI",     "qty":   2, "avg_price": 12932.28, "last_price": 13314.00, "instrument_token": 2815745},
+    {"tradingsymbol": "KOTAKGOLD",  "qty": 200, "avg_price":   121.45, "last_price":   124.70, "instrument_token": 5122049},
+    {"tradingsymbol": "VARUNBEV",   "qty":  44, "avg_price":   119.29, "last_price":   513.70, "instrument_token": 2273281},
+    {"tradingsymbol": "TATAMTRDVR", "qty":  52, "avg_price":   275.06, "last_price":   409.90, "instrument_token": 884993},
+    {"tradingsymbol": "MOTHERSON",  "qty": 157, "avg_price":    69.23, "last_price":   121.21, "instrument_token": 4006913},
+    {"tradingsymbol": "EXIDEIND",   "qty":  50, "avg_price":   184.71, "last_price":   360.55, "instrument_token": 1629697},
+    {"tradingsymbol": "SGBSEP31",   "qty":   5, "avg_price":  5873.00, "last_price": 15400.61, "instrument_token": 9900001},
 ]
 
 _OHLCV_OFFSETS = {
     # symbol: (open_delta, high_pct, low_pct, volume_base)
-    "ICICIBANK":  (  -3.20, 0.012, 0.008, 4_200_000),
-    "INFY":       (   5.80, 0.010, 0.009, 3_100_000),
-    "HDFCBANK":   (  -8.50, 0.011, 0.007, 5_800_000),
-    "BHARTIARTL": (  -2.10, 0.013, 0.006, 2_400_000),
-    "APOLLOHOSP": ( -45.00, 0.014, 0.010,   480_000),
-    "TATAMOTORS": (   4.30, 0.015, 0.012, 9_600_000),
-    "SUNPHARMA":  ( -11.20, 0.009, 0.008, 1_900_000),
-    "PFC":        (   2.50, 0.016, 0.011, 7_200_000),
+    "IRCTC":      (  -4.20, 0.013, 0.009, 2_100_000),
+    "POLYCAB":    ( -38.50, 0.011, 0.008,   480_000),
+    "RELIANCE":   (  -7.80, 0.010, 0.007, 9_800_000),
+    "OLECTRA":    ( -11.20, 0.015, 0.011,   760_000),
+    "MARUTI":     ( -55.00, 0.010, 0.007,   380_000),
+    "KOTAKGOLD":  (  -0.30, 0.006, 0.005,   540_000),
+    "VARUNBEV":   (  -5.10, 0.012, 0.009, 2_200_000),
+    "TATAMTRDVR": (  -3.40, 0.014, 0.010, 1_050_000),
+    "MOTHERSON":  (  -1.20, 0.013, 0.010, 4_800_000),
+    "EXIDEIND":   (  -2.90, 0.011, 0.008, 1_450_000),
+    "SGBSEP31":   ( -15.00, 0.005, 0.004,     3_500),
 }
 
 
 class MockKiteClient:
-    """Drop-in replacement for KiteClient when USE_MOCK=true."""
+    """Drop-in replacement for KiteClient when USE_MOCK_KITE=true."""
 
     def get_holdings(self) -> list[dict[str, Any]]:
         """Return mock portfolio holdings with pre-calculated PnL fields."""
@@ -54,13 +61,13 @@ class MockKiteClient:
     def get_quote(self, symbols: list[str]) -> dict[str, dict[str, Any]]:
         """Return OHLCV quote data for each requested symbol.
 
-        Accepts both bare symbols ("ICICIBANK") and exchange-prefixed form ("NSE:ICICIBANK").
+        Accepts both bare symbols ("IRCTC") and exchange-prefixed form ("NSE:IRCTC").
         The returned dict is always keyed as "NSE:SYMBOL".
         """
         by_symbol = {r["tradingsymbol"]: r for r in _HOLDINGS_DATA}
         result: dict[str, dict[str, Any]] = {}
         for sym in symbols:
-            bare = sym.split(":")[-1]  # "NSE:ICICIBANK" -> "ICICIBANK"
+            bare = sym.split(":")[-1]
             base = by_symbol.get(bare)
             if base is None:
                 continue
@@ -83,9 +90,9 @@ class MockKiteClient:
 
     def get_historical_data(
         self,
-        symbol,  # str tradingsymbol OR int instrument_token (passed by KiteClient)
-        from_date,  # datetime or "YYYY-MM-DD" string
-        to_date,    # datetime or "YYYY-MM-DD" string
+        symbol,
+        from_date,
+        to_date,
         interval: str = "day",
     ) -> list[dict[str, Any]]:
         """Return 200 rows of reproducible fake OHLCV history for a symbol."""

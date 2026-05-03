@@ -10,6 +10,25 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Near-SL holding injected in tests that need a WARNING scenario.
+# avg=275.06, last=240.00 → pnl_pct=-12.74% → within 3pp of -15% threshold → WARNING
+_NEAR_SL_HOLDINGS = [{
+    "tradingsymbol": "TATAMTRDVR",
+    "instrument_token": 884993,
+    "exchange": "NSE",
+    "product": "CNC",
+    "quantity": 52,
+    "average_price": 275.06,
+    "last_price": 240.00,
+    "pnl": round((240.00 - 275.06) * 52, 2),
+    "pnl_pct": round((240.00 - 275.06) / 275.06 * 100, 2),
+    "sl_price": round(275.06 * 0.85, 2),
+    "sl_distance_pct": round(((240.00 - round(275.06 * 0.85, 2)) / round(275.06 * 0.85, 2)) * 100, 2),
+    "sl_status": "WARNING",
+    "value": round(240.00 * 52, 2),
+    "weight_pct": 100.0,
+}]
+
 
 # ── 1. get_sl_threshold ───────────────────────────────────────────────────────
 
@@ -32,15 +51,16 @@ def test_get_sl_threshold_override():
 
 # ── 2. check_holdings_for_sl ─────────────────────────────────────────────────
 
-def test_check_holdings_pfc_warning():
-    """PFC at ~-14.1% must produce exactly one WARNING alert."""
+def test_check_holdings_near_sl_warning():
+    """Holding within 3pp of -15% SL must produce exactly one WARNING alert."""
     from agent.stoploss import check_holdings_for_sl, SLBreachAlert
-    alerts = check_holdings_for_sl()
+    with patch("agent.stoploss.get_holdings_with_sl_status", return_value=_NEAR_SL_HOLDINGS):
+        alerts = check_holdings_for_sl()
 
     assert len(alerts) == 1
     alert = alerts[0]
     assert isinstance(alert, SLBreachAlert)
-    assert alert.symbol == "PFC"
+    assert alert.symbol == "TATAMTRDVR"
     assert alert.severity == "WARNING"
     assert -15.0 < alert.pnl_pct < -12.0
 
@@ -54,12 +74,13 @@ def test_check_holdings_sorted_worst_first():
 
 
 def test_check_holdings_sl_price_correct():
-    """sl_price for PFC must equal avg_price * (1 + threshold/100)."""
+    """sl_price must equal avg_price * (1 + threshold/100) for the near-SL holding."""
     from agent.stoploss import check_holdings_for_sl
-    alerts = check_holdings_for_sl()
-    pfc = next(a for a in alerts if a.symbol == "PFC")
-    expected_sl = round(pfc.entry_price * (1 + pfc.sl_threshold_pct / 100), 2)
-    assert pfc.sl_price == expected_sl
+    with patch("agent.stoploss.get_holdings_with_sl_status", return_value=_NEAR_SL_HOLDINGS):
+        alerts = check_holdings_for_sl()
+    alert = next(a for a in alerts if a.symbol == "TATAMTRDVR")
+    expected_sl = round(alert.entry_price * (1 + alert.sl_threshold_pct / 100), 2)
+    assert alert.sl_price == expected_sl
 
 
 def test_check_holdings_no_breach_in_mock():
@@ -112,10 +133,10 @@ async def test_run_sl_monitor_counts():
          patch("agent.stoploss.send_sl_breach_alert", new_callable=AsyncMock, return_value=True):
         results = await run_sl_monitor()
 
-    assert results["checked"] == 8
-    assert results["warnings"] == 1
+    assert results["checked"] == 11
+    assert results["warnings"] == 0
     assert results["breaches"] == 0
-    assert results["alerted"] == 1
+    assert results["alerted"] == 0
     assert results["cooldown"] == 0
 
 
@@ -123,7 +144,8 @@ async def test_run_sl_monitor_counts():
 async def test_run_sl_monitor_skips_cooldown():
     """run_sl_monitor increments cooldown counter and skips Telegram when on cooldown."""
     from agent.stoploss import run_sl_monitor
-    with patch("agent.stoploss.is_on_cooldown", return_value=True), \
+    with patch("agent.stoploss.get_holdings_with_sl_status", return_value=_NEAR_SL_HOLDINGS), \
+         patch("agent.stoploss.is_on_cooldown", return_value=True), \
          patch("agent.stoploss.send_sl_breach_alert", new_callable=AsyncMock) as mock_tg:
         results = await run_sl_monitor()
 
@@ -136,7 +158,8 @@ async def test_run_sl_monitor_skips_cooldown():
 async def test_run_sl_monitor_sends_alert_with_token():
     """run_sl_monitor calls send_sl_breach_alert with the generated token."""
     from agent.stoploss import run_sl_monitor
-    with patch("agent.stoploss.is_on_cooldown", return_value=False), \
+    with patch("agent.stoploss.get_holdings_with_sl_status", return_value=_NEAR_SL_HOLDINGS), \
+         patch("agent.stoploss.is_on_cooldown", return_value=False), \
          patch("agent.stoploss.set_cooldown"), \
          patch("agent.stoploss.generate_token", return_value="test-token-xyz") as mock_gen, \
          patch("agent.stoploss.send_sl_breach_alert", new_callable=AsyncMock, return_value=True) as mock_tg:
@@ -145,7 +168,7 @@ async def test_run_sl_monitor_sends_alert_with_token():
     mock_gen.assert_called_once_with("STOPLOSS")
     call_kwargs = mock_tg.call_args.kwargs
     assert call_kwargs["token"] == "test-token-xyz"
-    assert call_kwargs["symbol"] == "PFC"
+    assert call_kwargs["symbol"] == "TATAMTRDVR"
 
 
 # ── 5. run_with_market_check ─────────────────────────────────────────────────

@@ -1,0 +1,12 @@
+Name	Qty.	Avg. Price	Current Price	Current Value	Returns	Returns %
+2.5% SGB 20-Sep-2031	5	5,873.00	15,400.61	₹ 77,003.05	₹ 47,638.05	162.23%
+IRCTC	119	365.28	539.55	₹ 64,206.45	₹ 20,738.13	47.71%
+Polycab India	5	2,402.43	8,110.50	₹ 40,552.50	₹ 28,540.35	237.60%
+Reliance Industries	24	960.03	1,430.80	₹ 34,339.20	₹ 11,298.48	49.04%
+Olectra Greentech	27	414.41	1,245.60	₹ 33,631.20	₹ 22,442.13	200.57%
+Maruti Suzuki India	2	12,932.28	13,314.00	₹ 26,628.00	₹ 763.44	2.95%
+Kotak Mahindra Gold ETF	200	121.45	124.7	₹ 24,940.00	₹ 650.00	2.68%
+Varun Beverages	44	119.29	513.7	₹ 22,602.80	₹ 17,354.04	330.63%
+Tata Motors Commercial Vehicles	52	275.06	409.9	₹ 21,314.80	₹ 7,011.68	49.02%
+Motherson	157	69.23	121.21	₹ 19,029.97	₹ 8,160.86	75.08%
+Exide Industries	50	184.71	360.55	₹ 18,027.50	₹ 8,792.00	95.20%

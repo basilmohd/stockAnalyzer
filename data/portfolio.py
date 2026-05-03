@@ -12,14 +12,17 @@ from core.kite_client import KiteClient
 logger = logging.getLogger(__name__)
 
 _SECTOR_MAP: dict[str, str] = {
-    "ICICIBANK":  "Banking",
-    "HDFCBANK":   "Banking",
-    "INFY":       "IT",
-    "BHARTIARTL": "Telecom",
-    "APOLLOHOSP": "Healthcare",
-    "TATAMOTORS": "Auto",
-    "SUNPHARMA":  "Pharma",
-    "PFC":        "Finance",
+    "IRCTC":      "Travel",
+    "POLYCAB":    "Industrials",
+    "RELIANCE":   "Oil & Gas",
+    "OLECTRA":    "EV & Auto",
+    "MARUTI":     "Auto",
+    "KOTAKGOLD":  "Gold ETF",
+    "VARUNBEV":   "FMCG",
+    "TATAMTRDVR": "Auto",
+    "MOTHERSON":  "Auto Ancillary",
+    "EXIDEIND":   "Auto Ancillary",
+    "SGBSEP31":   "Sovereign Bond",
 }
 
 

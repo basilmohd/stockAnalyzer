@@ -63,15 +63,24 @@ def test_check_holdings_for_sl_mock():
         assert hasattr(alert, "current_price")
 
 
-def test_pfc_appears_in_sl_alerts():
-    """PFC at -14.1% (within 3% of -15% SL) must appear in alerts as WARNING."""
+def test_near_sl_stock_appears_in_alerts():
+    """Holding within 3pp of -15% SL must appear in alerts as WARNING."""
     from agent.stoploss import check_holdings_for_sl
-    alerts = check_holdings_for_sl()
+    near_sl = [{
+        "tradingsymbol": "TATAMTRDVR", "instrument_token": 884993,
+        "exchange": "NSE", "product": "CNC", "quantity": 52,
+        "average_price": 275.06, "last_price": 240.00,
+        "pnl": -1823.12, "pnl_pct": -12.74,
+        "sl_price": 233.80, "sl_distance_pct": 2.65, "sl_status": "WARNING",
+        "value": 12480.00, "weight_pct": 100.0,
+    }]
+    with patch("agent.stoploss.get_holdings_with_sl_status", return_value=near_sl):
+        alerts = check_holdings_for_sl()
     symbols = [a.symbol for a in alerts]
-    assert "PFC" in symbols, f"Expected PFC in SL alerts, got: {symbols}"
-    pfc_alert = next(a for a in alerts if a.symbol == "PFC")
-    assert pfc_alert.severity in ("WARNING", "BREACH"), (
-        f"Expected PFC severity WARNING or BREACH, got: {pfc_alert.severity}"
+    assert "TATAMTRDVR" in symbols, f"Expected TATAMTRDVR in SL alerts, got: {symbols}"
+    alert = next(a for a in alerts if a.symbol == "TATAMTRDVR")
+    assert alert.severity in ("WARNING", "BREACH"), (
+        f"Expected WARNING or BREACH, got: {alert.severity}"
     )
 
 
@@ -80,8 +89,8 @@ def test_healthy_stock_not_in_alerts():
     from agent.stoploss import check_holdings_for_sl
     alerts = check_holdings_for_sl()
     symbols = [a.symbol for a in alerts]
-    assert "HDFCBANK" not in symbols, "HDFCBANK (+3.6%) should not be in SL alerts"
-    assert "BHARTIARTL" not in symbols, "BHARTIARTL (+4.7%) should not be in SL alerts"
+    assert "IRCTC" not in symbols, "IRCTC (+47.7%) should not be in SL alerts"
+    assert "RELIANCE" not in symbols, "RELIANCE (+49%) should not be in SL alerts"
 
 
 # ── Cooldown tests ────────────────────────────────────────────────────────────
@@ -110,23 +119,29 @@ def test_cooldown_set_and_check():
 def test_cooldown_prevents_double_alert():
     """After set_cooldown, is_on_cooldown returns True for that symbol."""
     from agent.stoploss import check_holdings_for_sl, is_on_cooldown, set_cooldown
+    near_sl = [{
+        "tradingsymbol": "TATAMTRDVR", "instrument_token": 884993,
+        "exchange": "NSE", "product": "CNC", "quantity": 52,
+        "average_price": 275.06, "last_price": 240.00,
+        "pnl": -1823.12, "pnl_pct": -12.74,
+        "sl_price": 233.80, "sl_distance_pct": 2.65, "sl_status": "WARNING",
+        "value": 12480.00, "weight_pct": 100.0,
+    }]
     mock_redis = _make_memory_redis()
-    with patch("agent.stoploss._redis", mock_redis):
+    with patch("agent.stoploss._redis", mock_redis), \
+         patch("agent.stoploss.get_holdings_with_sl_status", return_value=near_sl):
         alerts = check_holdings_for_sl()
-        assert "PFC" in [a.symbol for a in alerts], "PFC must appear in alerts before cooldown"
-        set_cooldown("PFC")
-        assert is_on_cooldown("PFC") is True
+        assert "TATAMTRDVR" in [a.symbol for a in alerts], "TATAMTRDVR must appear in alerts before cooldown"
+        set_cooldown("TATAMTRDVR")
+        assert is_on_cooldown("TATAMTRDVR") is True
 
 
 # ── run_sl_monitor tests ──────────────────────────────────────────────────────
 
 def test_run_sl_monitor_returns_dict():
-    """run_sl_monitor returns a summary dict with expected keys; checked == 8."""
+    """run_sl_monitor returns a summary dict with expected keys; checked == 11."""
     from agent.stoploss import run_sl_monitor
-    redis = RedisClient(REDIS_URL)
-    redis.delete("sl:alerted:PFC")
 
-    # Mock Telegram so this unit test does not send real messages
     with patch("agent.stoploss.send_sl_breach_alert", new_callable=AsyncMock) as mock_send:
         mock_send.return_value = True
         results = asyncio.run(run_sl_monitor())
@@ -135,24 +150,31 @@ def test_run_sl_monitor_returns_dict():
     assert "checked" in results
     assert "breaches" in results
     assert "alerted" in results
-    assert results["checked"] == 8
-
-    redis.delete("sl:alerted:PFC")
+    assert results["checked"] == 11
 
 
 @pytest.mark.integration
 def test_sl_monitor_sends_telegram():
-    """run_sl_monitor sends at least one real Telegram alert (PFC near SL)."""
+    """run_sl_monitor sends a real Telegram alert when a holding is near SL."""
     from agent.stoploss import run_sl_monitor
+    near_sl = [{
+        "tradingsymbol": "TATAMTRDVR", "instrument_token": 884993,
+        "exchange": "NSE", "product": "CNC", "quantity": 52,
+        "average_price": 275.06, "last_price": 240.00,
+        "pnl": -1823.12, "pnl_pct": -12.74,
+        "sl_price": 233.80, "sl_distance_pct": 2.65, "sl_status": "WARNING",
+        "value": 12480.00, "weight_pct": 100.0,
+    }]
     redis = RedisClient(REDIS_URL)
-    redis.delete("sl:alerted:PFC")
+    redis.delete("sl:alerted:TATAMTRDVR")
 
-    results = asyncio.run(run_sl_monitor())
+    with patch("agent.stoploss.get_holdings_with_sl_status", return_value=near_sl):
+        results = asyncio.run(run_sl_monitor())
 
     assert results["alerted"] >= 1, (
         f"Expected at least 1 Telegram alert sent, got: {results}"
     )
-    redis.delete("sl:alerted:PFC")
+    redis.delete("sl:alerted:TATAMTRDVR")
 
 
 # ── Market-hours gate tests ───────────────────────────────────────────────────

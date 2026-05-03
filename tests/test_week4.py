@@ -66,13 +66,13 @@ def test_above_sma_is_boolean():
 
 
 def test_get_technicals_for_all_holdings():
-    """get_technicals_for_holdings returns a dict with all 8 mock holdings."""
+    """get_technicals_for_holdings returns a dict with all 11 mock holdings."""
     from data.technicals import get_technicals_for_holdings
     mock_redis = _make_null_redis()
     with patch("data.technicals._redis", mock_redis):
         results = get_technicals_for_holdings()
     assert isinstance(results, dict)
-    assert len(results) == 8, f"Expected 8 holdings, got {len(results)}"
+    assert len(results) == 11, f"Expected 11 holdings, got {len(results)}"
 
 
 def test_technicals_cached_in_redis():
@@ -219,23 +219,29 @@ def test_bollinger_bands_ordering():
 
 
 def test_get_technicals_for_symbol():
-    """End-to-end: ICICIBANK is in get_technicals_for_holdings result with a valid RSI."""
+    """End-to-end: IRCTC is in get_technicals_for_holdings result with a valid RSI."""
     from data.technicals import get_technicals_for_holdings
     mock_redis = _make_null_redis()
     with patch("data.technicals._redis", mock_redis):
         results = get_technicals_for_holdings()
-    assert "ICICIBANK" in results, "ICICIBANK missing from results"
-    data = results["ICICIBANK"]
+    assert "IRCTC" in results, "IRCTC missing from results"
+    data = results["IRCTC"]
     assert hasattr(data, "rsi"), "IndicatorResult missing 'rsi'"
     assert 0.0 <= data.rsi <= 100.0, f"RSI out of range: {data.rsi}"
 
 
 def test_fetch_news_mock_mode():
     """fetch_news_for_symbol returns list of articles with required keys in mock mode."""
+    import config as _cfg
     from data.news import fetch_news_for_symbol
     mock_redis = _make_null_redis()
-    with patch("data.news._redis", mock_redis):
-        articles = fetch_news_for_symbol("ICICIBANK")
+    original = _cfg.USE_MOCK
+    _cfg.USE_MOCK = True
+    try:
+        with patch("data.news._redis", mock_redis):
+            articles = fetch_news_for_symbol("IRCTC")
+    finally:
+        _cfg.USE_MOCK = original
     assert isinstance(articles, list), "Expected a list"
     assert len(articles) > 0, "Expected at least one article"
     for article in articles:

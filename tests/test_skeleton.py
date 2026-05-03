@@ -41,17 +41,17 @@ def test_mock_holdings():
         "quantity", "average_price", "last_price", "pnl", "pnl_pct",
     }
     holdings = MockKiteClient().get_holdings()
-    assert len(holdings) == 8
+    assert len(holdings) == 11
     for h in holdings:
         assert required_keys.issubset(h.keys()), f"Missing keys in {h['tradingsymbol']}"
 
 
-def test_mock_pfc_near_sl():
-    """PFC pnl_pct must be between -20 and -10 (near our stop-loss)."""
+def test_mock_irctc_positive_pnl():
+    """IRCTC pnl_pct must be positive (strong performer in portfolio)."""
     from mocks.kite_mock import MockKiteClient
     holdings = MockKiteClient().get_holdings()
-    pfc = next(h for h in holdings if h["tradingsymbol"] == "PFC")
-    assert -20 <= pfc["pnl_pct"] <= -10, f"PFC pnl_pct={pfc['pnl_pct']} out of range"
+    irctc = next(h for h in holdings if h["tradingsymbol"] == "IRCTC")
+    assert irctc["pnl_pct"] > 0, f"IRCTC pnl_pct={irctc['pnl_pct']} should be positive"
 
 
 # ── 5. Mock news ──────────────────────────────────────────────────────────────

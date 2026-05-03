@@ -37,12 +37,12 @@ def test_kite_client_get_holdings():
 
 # ── 3. PFC near stop-loss ─────────────────────────────────────────────────────
 
-def test_holdings_pfc_near_sl():
-    """PFC pnl_pct must be between -20 and -5 (near stop-loss in mock data)."""
+def test_all_holdings_positive_pnl():
+    """All current portfolio holdings have positive P&L (well above SL threshold)."""
     from core.kite_client import KiteClient
     holdings = KiteClient().get_holdings()
-    pfc = next(h for h in holdings if h["tradingsymbol"] == "PFC")
-    assert -20 <= pfc["pnl_pct"] <= -5, f"PFC pnl_pct={pfc['pnl_pct']} out of expected range"
+    for h in holdings:
+        assert h["pnl_pct"] > 0, f"{h['tradingsymbol']} pnl_pct={h['pnl_pct']} should be positive"
 
 
 # ── 4. Quote fetch ────────────────────────────────────────────────────────────
@@ -50,9 +50,9 @@ def test_holdings_pfc_near_sl():
 def test_kite_client_get_quote():
     """get_quote returns both requested NSE symbols keyed as 'NSE:SYMBOL'."""
     from core.kite_client import KiteClient
-    result = KiteClient().get_quote(["NSE:ICICIBANK", "NSE:INFY"])
-    assert "NSE:ICICIBANK" in result
-    assert "NSE:INFY" in result
+    result = KiteClient().get_quote(["NSE:IRCTC", "NSE:RELIANCE"])
+    assert "NSE:IRCTC" in result
+    assert "NSE:RELIANCE" in result
 
 
 # ── 5. Order placement ────────────────────────────────────────────────────────
@@ -73,8 +73,8 @@ def test_portfolio_summary():
     from data.portfolio import get_portfolio_summary
     summary = get_portfolio_summary()
     assert summary["total_value"] > 0
-    assert summary["holdings_count"] == 8
-    assert "Banking" in summary["sector_weights"]
+    assert summary["holdings_count"] == 11
+    assert "Auto" in summary["sector_weights"]
     assert summary["top_gainer"]["pnl_pct"] > summary["top_loser"]["pnl_pct"]
 
 
@@ -87,20 +87,20 @@ def test_build_claude_context():
     assert "portfolio" in result
     assert "holdings" in result
     assert "risk_flags" in result
-    assert len(result["holdings"]) == 8
+    assert len(result["holdings"]) == 11
     assert all("sl_status" in h for h in result["holdings"])
-    assert len(result["risk_flags"]) >= 1  # PFC is near SL in mock data
+    assert len(result["risk_flags"]) >= 1  # SGBSEP31 slightly exceeds 20% weight
 
 
 # ── 8. SL status computation ──────────────────────────────────────────────────
 
 def test_sl_status_computation():
-    """PFC must be WARNING or BREACH; HDFCBANK must be SAFE."""
+    """All current holdings are far above SL — every status must be SAFE."""
     from data.portfolio import build_claude_context
     result = build_claude_context()
     by_sym = {h["symbol"]: h for h in result["holdings"]}
-    assert by_sym["PFC"]["sl_status"] in ("WARNING", "BREACH")
-    assert by_sym["HDFCBANK"]["sl_status"] == "SAFE"
+    assert by_sym["IRCTC"]["sl_status"] == "SAFE"
+    assert by_sym["RELIANCE"]["sl_status"] == "SAFE"
 
 
 # ── 9. OHLC fetch ─────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ def test_fetch_ohlc_mock():
     """fetch_ohlc returns a DataFrame with ≥50 rows and required columns."""
     import pandas as pd
     from data.technicals import fetch_ohlc
-    df = fetch_ohlc("ICICIBANK", 408065)  # 408065 is a valid mock instrument token
+    df = fetch_ohlc("IRCTC", 3484417)
     assert isinstance(df, pd.DataFrame)
     assert len(df) >= 50
     for col in ("open", "high", "low", "close", "volume"):
@@ -121,7 +121,7 @@ def test_fetch_ohlc_mock():
 def test_compute_indicators():
     """compute_indicators returns RSI in range, 200SMA bool flag, and volume ratio."""
     from data.technicals import fetch_ohlc, compute_indicators
-    df = fetch_ohlc("ICICIBANK", 408065)
+    df = fetch_ohlc("IRCTC", 3484417)
     result = compute_indicators(df)
     assert hasattr(result, "rsi")
     assert 0 < result.rsi < 100
@@ -132,12 +132,12 @@ def test_compute_indicators():
 # ── 11. Technicals for all holdings ──────────────────────────────────────────
 
 def test_get_technicals_for_holdings():
-    """get_technicals_for_holdings returns indicators for all 8 holdings."""
+    """get_technicals_for_holdings returns indicators for all 11 holdings."""
     from data.technicals import get_technicals_for_holdings
     result = get_technicals_for_holdings()
-    assert len(result) == 8
-    assert "ICICIBANK" in result
-    assert hasattr(result["ICICIBANK"], "rsi")
+    assert len(result) == 11
+    assert "IRCTC" in result
+    assert hasattr(result["IRCTC"], "rsi")
 
 
 # ── 12. Kite login endpoint ───────────────────────────────────────────────────

@@ -69,11 +69,13 @@ def test_signal_scan_has_required_keys():
     """Each signal returned by run_signal_scan has symbol, action, confidence, reason."""
     from agent.signals import run_signal_scan
 
-    mock_context = {"holdings": [{"symbol": "ICICIBANK", "pnl_pct": 3.5}]}
+    mock_context = {"holdings": [{"symbol": "IRCTC", "pnl_pct": 3.5}]}
+    mock_signals = [{"symbol": "IRCTC", "action": "HOLD", "confidence": 0.80, "reason": "Steady"}]
 
     with patch("agent.signals.build_claude_context", return_value=mock_context), \
          patch("agent.signals.get_technicals_for_holdings", return_value={}), \
-         patch("agent.signals.get_news_sentiment_all_holdings", return_value={}):
+         patch("agent.signals.get_news_sentiment_all_holdings", return_value={}), \
+         patch("core.claude_client.generate_signals", return_value=mock_signals):
         signals = run_signal_scan()
 
     assert len(signals) > 0

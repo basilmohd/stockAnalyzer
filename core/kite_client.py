@@ -1,6 +1,6 @@
 """
-Kite Connect wrapper. Delegates to MockKiteClient when USE_MOCK=true,
-or to the real KiteConnect SDK when USE_MOCK=false.
+Kite Connect wrapper. Delegates to MockKiteClient when USE_MOCK_KITE=true,
+or to the real KiteConnect SDK when USE_MOCK_KITE=false.
 """
 from datetime import datetime
 from typing import Optional
@@ -9,7 +9,7 @@ from config import (
     KITE_API_KEY,
     KITE_API_SECRET,
     REDIS_URL,
-    USE_MOCK,
+    USE_MOCK_KITE,
 )
 from core.redis_client import RedisClient
 
@@ -20,11 +20,11 @@ _redis = RedisClient(REDIS_URL)
 
 
 class KiteClient:
-    """Unified Kite Connect client — real or mock depending on USE_MOCK."""
+    """Unified Kite Connect client — real or mock depending on USE_MOCK_KITE."""
 
     def __init__(self) -> None:
-        """Initialise in mock or real mode based on USE_MOCK config flag."""
-        self.mock: bool = USE_MOCK
+        """Initialise in mock or real mode based on USE_MOCK_KITE config flag."""
+        self.mock: bool = USE_MOCK_KITE
 
         if self.mock:
             from mocks.kite_mock import MockKiteClient

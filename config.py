@@ -23,6 +23,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data_store/portfolio.db")
 USE_MOCK = os.getenv("USE_MOCK", "true").lower() == "true"
+USE_MOCK_KITE = os.getenv("USE_MOCK_KITE", str(USE_MOCK).lower()).lower() == "true"
 
 # ── Market Rules ──────────────────────────────────────────────────────────────
 MARKET_OPEN = "09:15"

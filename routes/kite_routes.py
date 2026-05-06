@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import USE_MOCK, USE_MOCK_KITE, REDIS_URL
 from core.kite_client import KiteClient
@@ -26,21 +26,29 @@ _ERROR_HTML = "<html><body><h2>&#x274C; Authentication failed</h2><p>{msg}</p></
 
 
 @router.get("/login")
-async def kite_login() -> dict:
-    """Return the Kite OAuth login URL."""
+async def kite_login() -> RedirectResponse:
+    """Redirect the browser directly to Zerodha's OAuth login page."""
     url = KiteClient().get_login_url()
-    return {"login_url": url, "message": "Open this URL to authenticate"}
+    logger.info("Kite OAuth login — redirecting to Zerodha")
+    return RedirectResponse(url=url, status_code=302)
 
 
 @router.get("/callback")
 async def kite_oauth_callback(
     request_token: str = "",
+    status: Optional[str] = None,
     state: Optional[str] = None,
+    message: Optional[str] = None,
 ) -> HTMLResponse:
     """
-    Handle Kite OAuth redirect. Exchanges request_token for access token
-    and persists it in Redis via generate_session.
+    Handle Kite OAuth redirect. Detects failure status early, then
+    exchanges request_token for access token and persists it in Redis.
     """
+    if status == "failure":
+        reason = message or "Login was cancelled or rejected by Zerodha."
+        logger.warning("Kite OAuth failure redirect: %s", reason)
+        return HTMLResponse(content=_ERROR_HTML.format(msg=reason), status_code=400)
+
     try:
         token = request_token
         if USE_MOCK_KITE and not token:

@@ -4,6 +4,7 @@ or to the real KiteConnect SDK when USE_MOCK_KITE=false.
 """
 from datetime import datetime
 from typing import Optional
+import time
 
 from config import (
     KITE_API_KEY,
@@ -78,43 +79,103 @@ class KiteClient:
     # ── Market Data ───────────────────────────────────────────────────────────
 
     def get_holdings(self) -> list[dict]:
-        """Return normalised portfolio holdings list with pnl and pnl_pct fields."""
+        """Return normalised portfolio holdings list with pnl and pnl_pct fields.
+        
+        Uses retry logic (3 attempts, exponential backoff) and Redis cache fallback.
+        If API fails, returns cached data if available.
+        """
         try:
             if self.mock:
                 return self.kite.get_holdings()
 
-            raw_list: list[dict] = self.kite.holdings()
-            holdings = []
-            for raw in raw_list:
-                avg = raw.get("average_price", 0.0)
-                lp = raw.get("last_price", 0.0)
-                pnl = raw.get("pnl", (lp - avg) * raw.get("quantity", 0))
-                pnl_pct = raw.get(
-                    "pnl_pct",
-                    ((lp - avg) / avg * 100) if avg else 0.0,
-                )
-                holdings.append({
-                    "tradingsymbol":    raw.get("tradingsymbol", ""),
-                    "exchange":         raw.get("exchange", "NSE"),
-                    "quantity":         raw.get("quantity", 0),
-                    "average_price":    avg,
-                    "last_price":       lp,
-                    "pnl":              round(pnl, 2),
-                    "pnl_pct":          round(pnl_pct, 2),
-                    "product":          raw.get("product", "CNC"),
-                    "instrument_token": raw.get("instrument_token", 0),
-                })
-            return holdings
+            # Try to fetch from Kite API with retry logic
+            max_retries = 3
+            retry_delay = 1  # Start with 1 second
+            
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"get_holdings: attempt {attempt + 1}/{max_retries}")
+                    raw_list: list[dict] = self.kite.holdings()
+                    
+                    # Normalize and cache on success
+                    holdings = self._normalize_holdings(raw_list)
+                    _redis.setex("kite:holdings_cache", 300, str(holdings))  # 5min cache
+                    logger.info(f"get_holdings: success, cached {len(holdings)} holdings")
+                    return holdings
+                    
+                except (TimeoutError, ConnectionError, Exception) as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"get_holdings attempt {attempt + 1} failed: {e}, retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                    else:
+                        logger.error(f"get_holdings: all {max_retries} attempts failed: {e}")
+                        raise
+            
         except Exception as exc:
-            logger.error("get_holdings error: %s", exc)
+            logger.error(f"get_holdings error: {exc}, attempting fallback to cache...")
+            
+            # Try cache fallback
+            cached = _redis.get("kite:holdings_cache")
+            if cached:
+                logger.info("Using cached holdings data")
+                import ast
+                return ast.literal_eval(cached)
+            
+            logger.error(f"get_holdings: no cache available, raising error")
             raise
 
+    def _normalize_holdings(self, raw_list: list[dict]) -> list[dict]:
+        """Normalize Kite raw holdings to our standard format."""
+        holdings = []
+        for raw in raw_list:
+            avg = raw.get("average_price", 0.0)
+            lp = raw.get("last_price", 0.0)
+            pnl = raw.get("pnl", (lp - avg) * raw.get("quantity", 0))
+            pnl_pct = raw.get(
+                "pnl_pct",
+                ((lp - avg) / avg * 100) if avg else 0.0,
+            )
+            holdings.append({
+                "tradingsymbol":    raw.get("tradingsymbol", ""),
+                "exchange":         raw.get("exchange", "NSE"),
+                "quantity":         raw.get("quantity", 0),
+                "average_price":    avg,
+                "last_price":       lp,
+                "pnl":              round(pnl, 2),
+                "pnl_pct":          round(pnl_pct, 2),
+                "product":          raw.get("product", "CNC"),
+                "instrument_token": raw.get("instrument_token", 0),
+            })
+        return holdings
+
     def get_quote(self, symbols: list[str]) -> dict:
-        """Return OHLCV quote data keyed by 'NSE:SYMBOL'. symbols format: ['NSE:ICICIBANK']."""
+        """Return OHLCV quote data keyed by 'NSE:SYMBOL'. symbols format: ['NSE:ICICIBANK'].
+        
+        Uses retry logic (3 attempts, exponential backoff) to handle API timeouts.
+        """
         try:
             if self.mock:
                 return self.kite.get_quote(symbols)
-            return self.kite.quote(symbols)
+
+            # Try to fetch from Kite API with retry logic
+            max_retries = 3
+            retry_delay = 1
+            
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"get_quote: attempt {attempt + 1}/{max_retries} for {len(symbols)} symbols")
+                    return self.kite.quote(symbols)
+                    
+                except (TimeoutError, ConnectionError, Exception) as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"get_quote attempt {attempt + 1} failed: {e}, retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                    else:
+                        logger.error(f"get_quote: all {max_retries} attempts failed: {e}")
+                        raise
+                        
         except Exception as exc:
             logger.error("get_quote error: %s", exc)
             raise

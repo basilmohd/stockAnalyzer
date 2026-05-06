@@ -27,7 +27,15 @@
       "PowerShell(Get-Process *326)",
       "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); python --version 2>&1; python3 --version 2>&1)",
       "Bash(pip show *)",
-      "Bash(pip index *)"
+      "Bash(pip index *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Basil\\\\Projects\\\\stockAnalyzer\" -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName | ForEach-Object { $_.FullName })",
+      "PowerShell([System.IO.Directory]::GetDirectories\\(\"C:\\\\\"\\) | ForEach-Object { $_ })",
+      "PowerShell($env:PATH -split \";\")",
+      "PowerShell(cd C:\\\\Basil\\\\Projects\\\\stockAnalyzer; powershell -ExecutionPolicy Bypass -File .\\\\start_local.ps1 2>&1)",
+      "PowerShell(Start-Process -FilePath $ngrok -ArgumentList \"http 8000\" -WindowStyle Hidden -PassThru)",
+      "PowerShell($ngrok = \"C:\\\\Users\\\\CoreX\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\ngrok.exe\")",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/health\" -ErrorAction SilentlyContinue | ConvertTo-Json)"
     ]
   }
 }

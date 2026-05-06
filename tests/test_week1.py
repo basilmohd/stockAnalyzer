@@ -143,13 +143,13 @@ def test_get_technicals_for_holdings():
 # ── 12. Kite login endpoint ───────────────────────────────────────────────────
 
 def test_kite_login_endpoint():
-    """GET /kite/login returns 200 with login_url key."""
+    """GET /kite/login returns 302 redirect to the Zerodha OAuth login URL."""
     from fastapi.testclient import TestClient
     from webhook_server import app
-    with TestClient(app) as client:
+    with TestClient(app, follow_redirects=False) as client:
         response = client.get("/kite/login")
-    assert response.status_code == 200
-    assert "login_url" in response.json()
+    assert response.status_code == 302
+    assert "location" in response.headers
 
 
 # ── 13. Kite status endpoint ──────────────────────────────────────────────────

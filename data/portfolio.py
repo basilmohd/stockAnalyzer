@@ -2,14 +2,14 @@
 Portfolio context builder — fetches holdings, computes SL status,
 and produces structured data for Claude prompts.
 """
-import logging
 from datetime import datetime
 from typing import Optional
 
 from config import DEFAULT_SL_PCT, MAX_POSITION_PCT, SL_OVERRIDES
 from core.kite_client import KiteClient
+from core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 _SECTOR_MAP: dict[str, str] = {
     "IRCTC":      "Travel",
@@ -31,13 +31,31 @@ def _sl_pct(symbol: str) -> float:
     return SL_OVERRIDES.get(symbol, DEFAULT_SL_PCT)
 
 
+def _filter_valid_holdings(holdings: list[dict]) -> list[dict]:
+    """
+    Filter out holdings with zero quantity (sold-out positions still in holdings list).
+    
+    Args:
+        holdings: List of holding dicts from KiteClient.get_holdings()
+    
+    Returns:
+        Filtered list containing only holdings with quantity > 0
+    """
+    valid = [h for h in holdings if h.get("quantity", 0) > 0]
+    if len(valid) < len(holdings):
+        filtered_out = len(holdings) - len(valid)
+        logger.info(f"Filtered out {filtered_out} holding(s) with 0 shares")
+    return valid
+
+
 def get_holdings_with_sl_status() -> list[dict]:
     """
     Fetch holdings from KiteClient and enrich each with SL fields and portfolio weight.
 
-    Returns list sorted by holding value descending.
+    Returns list sorted by holding value descending. Excludes holdings with 0 shares.
     """
     raw: list[dict] = KiteClient().get_holdings()
+    raw = _filter_valid_holdings(raw)
 
     enriched: list[dict] = []
     for h in raw:

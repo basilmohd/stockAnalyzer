@@ -1,7 +1,6 @@
 """OHLC fetcher and technical indicator computation layer."""
 
 import json
-import logging
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
@@ -11,9 +10,10 @@ import pandas_ta  # noqa: F401 — registers df.ta accessor
 
 import config
 from core.kite_client import KiteClient
+from core.logger import get_logger
 from core.redis_client import RedisClient
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 _redis = RedisClient(config.REDIS_URL)
 
 
@@ -129,8 +129,12 @@ def compute_indicators(df: pd.DataFrame) -> IndicatorResult:
 
 
 def get_technicals_for_holdings() -> dict[str, "IndicatorResult | dict"]:
-    """Compute technical indicators for every holding, using Redis cache (TTL 1h)."""
-    holdings = KiteClient().get_holdings()
+    """Compute technical indicators for every holding, using Redis cache (TTL 1h).
+    
+    Excludes holdings with 0 shares.
+    """
+    from data.portfolio import _filter_valid_holdings
+    holdings = _filter_valid_holdings(KiteClient().get_holdings())
     results: dict = {}
     start = time.time()
 

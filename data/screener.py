@@ -11,14 +11,14 @@ Universe strategy (hybrid):
 """
 
 import json
-import logging
 import random
 
 import config
+from core.logger import get_logger
 from core.redis_client import RedisClient
 from data.news import compute_sentiment_score, fetch_news_for_symbol
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 _redis = RedisClient(config.REDIS_URL)
 
 _UNIVERSE_CACHE_KEY = "universe:nifty200"

@@ -38,7 +38,8 @@ CASH_RESERVE_PCT = 10.0        # Always keep 10% cash
 APPROVAL_EXPIRY_MINS = 30      # Signal approval expires in 30 minutes
 SL_APPROVAL_EXPIRY_MINS = 15   # SL breach approval expires in 15 minutes
 SL_COOLDOWN_MINS = 30          # Don't re-alert same stock within 30 min
-
+# ── Cache Settings ────────────────────────────────────────────────────────────
+HOLDINGS_CACHE_TTL = 60         # Holdings cache TTL in seconds (1 minute for fresher SL monitoring)
 # ── Per-stock SL overrides (symbol: pct) ─────────────────────────────────────
 SL_OVERRIDES: dict[str, float] = {}
 
@@ -50,6 +51,12 @@ USE_MOCK_AI = os.getenv("USE_MOCK_AI", "true").lower() == "true"
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+
+# ── Chat Feature ──────────────────────────────────────────────────────────────
+CHAT_DAILY_LIMIT = 20                       # Max queries per user per day
+CHAT_HISTORY_MAX_MESSAGES = 10              # Keep last N messages in conversation
+CHAT_HISTORY_TTL = 86400                    # 24 hours in seconds
+CHAT_CONTEXT_SOURCES = ["portfolio", "technicals", "news", "risk_flags"]  # Data to include in context
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

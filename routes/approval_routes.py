@@ -56,6 +56,12 @@ async def handle_signal_execution(token: str) -> dict:
     kite = KiteClient()
     order_result = kite.place_order(symbol, action, quantity)
 
+    # Clear holdings cache after successful order so next SL/signal check gets fresh data
+    if order_result.get("status") == "COMPLETE":
+        from core.redis_client import _redis
+        cleared = _redis.delete("kite:holdings_cache")
+        logger.info("Holdings cache cleared after order execution: %s", cleared)
+
     if order_result.get("status") == "COMPLETE":
         order_id = order_result["order_id"]
 

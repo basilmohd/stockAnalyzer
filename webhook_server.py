@@ -31,6 +31,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting Portfolio Agent — Webhook Server")
     app.state.redis = RedisClient(REDIS_URL)
     init_db()
+    # Register bot commands with Telegram
+    from core.telegram_bot import register_bot_commands
+    await register_bot_commands()
     logger.info("Webhook server ready on port 8000")
     yield
     logger.info("Webhook server shutting down")
@@ -131,6 +134,21 @@ def health_latest() -> dict:
     if not snap:
         return {"status": "no_data", "data": None}
     return {"status": "ok", "data": json.loads(snap.health_score_json)}
+
+
+@app.post("/health/clear-cache")
+def clear_holdings_cache(request: Request) -> dict:
+    """Manually clear Redis holdings cache (debug endpoint).
+    
+    Useful when you've manually traded via Zerodha portal and want to force a
+    refresh without waiting for the 30-min periodic refresh job.
+    """
+    cleared = request.app.state.redis.delete("kite:holdings_cache")
+    if cleared:
+        logger.info("Holdings cache manually cleared via POST /health/clear-cache")
+        return {"status": "ok", "message": "Holdings cache cleared successfully"}
+    else:
+        return {"status": "ok", "message": "Holdings cache was not present or Redis unavailable"}
 
 
 if __name__ == "__main__":

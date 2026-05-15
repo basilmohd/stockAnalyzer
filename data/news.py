@@ -1,13 +1,13 @@
 """News fetcher and sentiment scoring for portfolio symbols."""
 
 import json
-import logging
 from datetime import datetime, timedelta
 
 import config
+from core.logger import get_logger
 from core.redis_client import RedisClient
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 _redis = RedisClient(config.REDIS_URL)
 
 _BULLISH_KEYWORDS = {"gain", "beat", "surge", "strong", "bullish", "rally", "jump", "rise", "profit"}
@@ -212,10 +212,12 @@ def compute_sentiment_score(articles: list[dict]) -> dict:
 def get_news_sentiment_all_holdings() -> dict[str, dict]:
     """Fetch and score news sentiment for every holding in the portfolio.
 
+    Excludes holdings with 0 shares.
     Returns {symbol: compute_sentiment_score result, ...}.
     """
+    from data.portfolio import _filter_valid_holdings
     from core.kite_client import KiteClient
-    holdings = KiteClient().get_holdings()
+    holdings = _filter_valid_holdings(KiteClient().get_holdings())
     results: dict[str, dict] = {}
     for holding in holdings:
         symbol: str = holding["tradingsymbol"]

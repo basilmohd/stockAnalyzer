@@ -83,6 +83,29 @@ async def get_webhook_info() -> dict:
         }
     except Exception as exc:
         logger.error("get_webhook_info failed: %s", exc)
+
+
+async def register_bot_commands() -> bool:
+    """Register /chat and other commands with Telegram bot menu.
+
+    Returns True on success, False on error.
+    """
+    try:
+        from telegram import BotCommand
+
+        bot = get_bot()
+        commands = [
+            BotCommand("chat", "Ask LLM about your portfolio (use: /chat your question)"),
+            BotCommand("start", "Start the portfolio agent"),
+            BotCommand("help", "Show available commands"),
+        ]
+        await bot.set_my_commands(commands)
+        logger.info("Telegram bot commands registered: %d commands", len(commands))
+        return True
+    except Exception as exc:
+        logger.error("register_bot_commands failed: %s", exc)
+        return False
+
         return {}
 
 
@@ -124,6 +147,45 @@ async def send_alert(
         f"<i>{now_ist}</i>"
     )
     return await send_message(text)
+
+
+async def send_sl_approval_request(
+    token: str,
+    title: str,
+    body: str,
+    execute_label: str = "🚨 EXECUTE EXIT",
+    skip_label: str = "⏸ HOLD / OVERRIDE",
+    expiry_mins: int = 15,
+) -> bool:
+    """Send an inline-keyboard approval request for SL breach — uses execute callback.
+    
+    Unlike send_approval_request(), this uses execute:{token} callback so the order
+    is placed immediately when the user taps the button, not just marked as approved.
+    """
+    btn_execute = InlineKeyboardButton(execute_label, callback_data=f"execute:{token}")
+    btn_skip = InlineKeyboardButton(skip_label, callback_data=f"skip:{token}")
+    keyboard = InlineKeyboardMarkup([[btn_execute, btn_skip]])
+
+    text = (
+        f"📡 <b>{title}</b>\n"
+        f"\n"
+        f"{body}\n"
+        f"\n"
+        f"⏱ <i>Expires in {expiry_mins} minutes</i>"
+    )
+    try:
+        bot = get_bot()
+        await bot.send_message(
+            chat_id=TELEGRAM_CHAT_ID,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+        logger.info("Telegram: SL approval request sent (token=%s)", token)
+        return True
+    except Exception as exc:
+        logger.error("Telegram send_sl_approval_request failed: %s", exc)
+        return False
 
 
 async def send_approval_request(
@@ -290,11 +352,11 @@ async def send_sl_breach_alert(
         f"Est. locked loss: ₹{est_locked_loss:,.0f}"
     )
 
-    return await send_approval_request(
+    return await send_sl_approval_request(
         token=token,
         title="🚨 URGENT — STOP LOSS BREACH",
         body=body,
-        approve_label="🚨 EXECUTE EXIT",
+        execute_label="🚨 EXECUTE EXIT",
         skip_label="⏸ HOLD / OVERRIDE",
         expiry_mins=15,
     )

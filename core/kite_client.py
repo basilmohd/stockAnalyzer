@@ -99,8 +99,9 @@ class KiteClient:
                     
                     # Normalize and cache on success
                     holdings = self._normalize_holdings(raw_list)
-                    _redis.setex("kite:holdings_cache", 300, str(holdings))  # 5min cache
-                    logger.info(f"get_holdings: success, cached {len(holdings)} holdings")
+                    from config import HOLDINGS_CACHE_TTL
+                    _redis.setex("kite:holdings_cache", HOLDINGS_CACHE_TTL, str(holdings))
+                    logger.info(f"get_holdings: success, cached {len(holdings)} holdings (TTL={HOLDINGS_CACHE_TTL}s)")
                     return holdings
                     
                 except (TimeoutError, ConnectionError, Exception) as e:

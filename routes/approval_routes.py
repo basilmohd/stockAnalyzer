@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from core.approval import mark_approved, mark_skipped, validate_token
+from core.db import get_db
 from core.telegram_bot import send_alert
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,9 @@ async def handle_signal_execution(token: str) -> dict:
     """Execute a Kite order for the signal linked to *token*.
 
     Called when user taps [✅ EXECUTE] on a signal alert. Validates the token,
-    fetches the linked signal from SQLite, places the order, records it, and
-    sends a Telegram confirmation. Never raises — returns error dict on failure.
+    fetches the linked signal from SQLite (or handles STOPLOSS directly),
+    places the order, records it, and sends a Telegram confirmation. 
+    Never raises — returns error dict on failure.
     """
     result = validate_token(token)
     if not result["valid"]:
@@ -31,6 +33,82 @@ async def handle_signal_execution(token: str) -> dict:
         )
         return {"status": "error", "reason": result["reason"]}
 
+    action_type = result.get("action_type")
+    
+    # Handle STOPLOSS execution directly (no signal_id needed)
+    if action_type == "STOPLOSS":
+        symbol = result.get("symbol")
+        if not symbol:
+            await send_alert(
+                "Execution Error",
+                "⚠️ No symbol linked to this stop-loss token.",
+                alert_type="WARNING",
+            )
+            return {"status": "error", "reason": "No symbol on STOPLOSS token"}
+        
+        from core.kite_client import KiteClient
+        
+        # Determine quantity from holdings
+        kite = KiteClient()
+        holdings = kite.get_holdings()
+        quantity = 0
+        for holding in holdings:
+            if holding.get("tradingsymbol") == symbol:
+                quantity = holding.get("quantity", 0)
+                break
+        
+        if quantity <= 0:
+            await send_alert(
+                "Execution Error",
+                f"⚠️ No shares found for {symbol} in holdings.",
+                alert_type="WARNING",
+            )
+            return {"status": "error", "reason": f"No shares of {symbol} to sell"}
+        
+        order_result = kite.place_order(symbol, "SELL", quantity)
+        
+        if order_result.get("status") == "COMPLETE":
+            # Clear holdings cache so next SL/signal check gets fresh data
+            from config import REDIS_URL
+            from core.redis_client import RedisClient
+            redis_client = RedisClient(REDIS_URL)
+            cleared = redis_client.delete("kite:holdings_cache")
+            logger.info("Holdings cache cleared after SL exit: %s", cleared)
+            
+            order_id = order_result["order_id"]
+            
+            with get_db() as db:
+                from models.order import Order
+                order_rec = Order(
+                    signal_id=None,
+                    kite_order_id=order_id,
+                    symbol=symbol,
+                    action="SELL",
+                    quantity=quantity,
+                    order_type="MARKET",
+                    product="CNC",
+                    status="COMPLETE",
+                    placed_at=datetime.now(),
+                )
+                db.add(order_rec)
+                db.commit()
+            
+            mark_approved(token)
+            
+            await send_alert(
+                "Stop-Loss Exit Executed",
+                f"✅ STOPLOSS EXIT EXECUTED\n{symbol} | SELL | Qty: {quantity}\nOrder ID: {order_id}",
+                alert_type="SUCCESS",
+            )
+            logger.info("STOPLOSS exit executed: %s SELL qty=%d order_id=%s", symbol, quantity, order_id)
+            return {"status": "ok", "order_id": order_id, "symbol": symbol, "action": "SELL"}
+        
+        error = order_result.get("error", "Unknown error")
+        await send_alert("Stop-Loss Exit Failed", f"❌ Exit Failed — {error}", alert_type="WARNING")
+        logger.error("STOPLOSS exit failed: %s: %s", symbol, error)
+        return {"status": "error", "reason": error}
+    
+    # Handle SIGNAL execution (original logic)
     signal_id = result.get("signal_id")
     if not signal_id:
         await send_alert(
@@ -40,7 +118,6 @@ async def handle_signal_execution(token: str) -> dict:
         )
         return {"status": "error", "reason": "No signal_id on token"}
 
-    from core.db import get_db
     from core.kite_client import KiteClient
     from models.order import Order
     from models.signal import Signal
@@ -58,8 +135,10 @@ async def handle_signal_execution(token: str) -> dict:
 
     # Clear holdings cache after successful order so next SL/signal check gets fresh data
     if order_result.get("status") == "COMPLETE":
-        from core.redis_client import _redis
-        cleared = _redis.delete("kite:holdings_cache")
+        from config import REDIS_URL
+        from core.redis_client import RedisClient
+        redis_client = RedisClient(REDIS_URL)
+        cleared = redis_client.delete("kite:holdings_cache")
         logger.info("Holdings cache cleared after order execution: %s", cleared)
 
     if order_result.get("status") == "COMPLETE":

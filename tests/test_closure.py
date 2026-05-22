@@ -217,28 +217,28 @@ def test_get_top_gainers_losers_happy_path(mock_holdings, mock_prev_close_prices
     
     gainers, losers = get_top_gainers_losers(holdings_with_pnl, top_n=3)
     
-    # Top gainers: INFY (+6.67%), RELIANCE (+7.14%), HDFCBANK (0%)
-    # Wait, let me recalculate:
-    # RELIANCE: (1500-1400)/1400 = +7.14%
-    # INFY: (1600-1500)/1500 = +6.67%
-    # HDFCBANK: (1800-1800)/1800 = 0%
-    # TCS: (4000-4100)/4100 = -2.44%
-    # ICICIBANK: (900-950)/950 = -5.26%
+    # Calculations:
+    # RELIANCE: (1500-1400)/1400 = +7.14% ✓ gainer
+    # INFY: (1600-1500)/1500 = +6.67% ✓ gainer
+    # HDFCBANK: (1800-1800)/1800 = 0% ✗ excluded (not a gain)
+    # TCS: (4000-4100)/4100 = -2.44% ✓ loser
+    # ICICIBANK: (900-950)/950 = -5.26% ✓ loser
     
-    assert len(gainers) == 3
+    # Top gainers: only stocks with daily_pnl_pct > 0
+    assert len(gainers) == 2
     assert gainers[0].symbol == "RELIANCE"  # +7.14% (highest)
     assert gainers[1].symbol == "INFY"      # +6.67%
-    assert gainers[2].symbol == "HDFCBANK"  # 0%
     
-    assert len(losers) == 3
-    assert losers[0].symbol == "ICICIBANK"  # -5.26% (lowest)
+    # Top losers: only stocks with daily_pnl_pct < 0, sorted by loss magnitude
+    assert len(losers) == 2
+    assert losers[0].symbol == "ICICIBANK"  # -5.26% (biggest loss)
     assert losers[1].symbol == "TCS"        # -2.44%
 
 
 def test_get_top_gainers_losers_fewer_than_n(mock_holdings, mock_prev_close_prices):
     """Test extraction when fewer holdings than top_n."""
     
-    # Only 2 holdings
+    # Only 2 holdings: RELIANCE (+7.14% gainer) and TCS (-2.44% loser)
     two_holdings = mock_holdings[:2]
     holdings_with_pnl = [
         HoldingWithDailyPnL(
@@ -252,9 +252,11 @@ def test_get_top_gainers_losers_fewer_than_n(mock_holdings, mock_prev_close_pric
     
     gainers, losers = get_top_gainers_losers(holdings_with_pnl, top_n=3)
     
-    # Should return all available
-    assert len(gainers) == 2
-    assert len(losers) == 2
+    # Only 1 gainer (RELIANCE) and 1 loser (TCS) available
+    assert len(gainers) == 1
+    assert gainers[0].symbol == "RELIANCE"
+    assert len(losers) == 1
+    assert losers[0].symbol == "TCS"
 
 
 def test_get_top_gainers_losers_empty_list():

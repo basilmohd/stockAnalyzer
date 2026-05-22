@@ -18,6 +18,7 @@ IST = ZoneInfo(TIMEZONE)
 def generate_token(
     action_type: str,
     signal_id: int | None = None,
+    symbol: str | None = None,
     expiry_mins: int | None = None,
 ) -> str:
     """Create a PENDING approval token and persist it to SQLite. Returns the token string."""
@@ -34,6 +35,7 @@ def generate_token(
             token=token,
             signal_id=signal_id,
             action_type=action_type,
+            symbol=symbol,
             status="PENDING",
             expires_at=expires_at,
         )
@@ -65,6 +67,7 @@ def validate_token(token: str) -> dict:
             "token": token,
             "action_type": approval.action_type,
             "signal_id": approval.signal_id,
+            "symbol": approval.symbol,
             "expires_at": str(approval.expires_at),
         }
 

@@ -134,27 +134,33 @@ def get_top_gainers_losers(
     """
     Extract top N gainers and top N losers by daily P&L %.
     
+    Only includes stocks that actually gained/lost value for the day.
+    Gainers: daily_pnl_pct > 0, sorted descending.
+    Losers: daily_pnl_pct < 0, sorted ascending (biggest losers first).
+    
     Args:
         holdings_with_pnl: List of HoldingWithDailyPnL.
         top_n: Number of top gainers/losers to extract (default 3).
     
     Returns:
-        tuple: (top_gainers, top_losers) — each sorted by daily_pnl_pct desc/asc.
+        tuple: (top_gainers, top_losers) — only stocks that gained/lost.
     """
     try:
         if not holdings_with_pnl:
             return [], []
         
-        # Sort by daily_pnl_pct descending (high to low)
-        sorted_by_pnl = sorted(
-            holdings_with_pnl, key=lambda h: h.daily_pnl_pct, reverse=True
-        )
+        # Filter for gainers: daily_pnl_pct > 0, sort descending
+        gainers = sorted(
+            [h for h in holdings_with_pnl if h.daily_pnl_pct > 0],
+            key=lambda h: h.daily_pnl_pct,
+            reverse=True
+        )[:top_n]
         
-        # Top gainers = highest daily_pnl_pct
-        gainers = sorted_by_pnl[:top_n]
-        
-        # Top losers = lowest daily_pnl_pct (reverse list and take top_n)
-        losers = sorted_by_pnl[-top_n:][::-1]
+        # Filter for losers: daily_pnl_pct < 0, sort ascending (most negative first)
+        losers = sorted(
+            [h for h in holdings_with_pnl if h.daily_pnl_pct < 0],
+            key=lambda h: h.daily_pnl_pct
+        )[:top_n]
         
         return gainers, losers
         

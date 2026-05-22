@@ -15,8 +15,8 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    signal_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("signals.id"), nullable=False
+    signal_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("signals.id"), nullable=True
     )
     kite_order_id: Mapped[str | None] = mapped_column(String, nullable=True)
     symbol: Mapped[str] = mapped_column(String, nullable=False)

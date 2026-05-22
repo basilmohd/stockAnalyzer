@@ -189,12 +189,12 @@ async def main() -> None:
     # ── 10-job schedule ───────────────────────────────────────────────────────
     scheduler.add_job(
         heartbeat_job,
-        CronTrigger(hour=7, minute=0, timezone=IST),
+        CronTrigger(hour=8, minute=30, timezone=IST),
         id="heartbeat", name="Daily Heartbeat",
     )
     scheduler.add_job(
         morning_briefing_job,
-        CronTrigger(hour=8, minute=30, day_of_week="mon-fri", timezone=IST),
+        CronTrigger(hour=9, minute=0, day_of_week="mon-fri", timezone=IST),
         id="morning_briefing", name="Morning Briefing",
         misfire_grace_time=900,  # Allow up to 15 minutes late execution
     )
@@ -233,7 +233,7 @@ async def main() -> None:
     )
     scheduler.add_job(
         weekly_health_job,
-        CronTrigger(hour=9, minute=0, day_of_week="sun", timezone=IST),
+        CronTrigger(hour=3, minute=45, day_of_week="fri", timezone=IST),
         id="weekly_health", name="Weekly Health Report",
         misfire_grace_time=7200,  # Allow up to 2 hours late execution
     )
@@ -244,8 +244,8 @@ async def main() -> None:
     )
     scheduler.add_job(
         store_closing_prices_job,
-        CronTrigger(hour=15, minute=30, day_of_week="mon-fri", timezone=IST),
-        id="store_closing_prices", name="Store Closing Prices (3:30 PM)",
+        CronTrigger(hour=15, minute=20, day_of_week="mon-fri", timezone=IST),
+        id="store_closing_prices", name="Store Closing Prices (3:20 PM)",
         misfire_grace_time=1800,  # Allow up to 30 minutes late execution
     )
     scheduler.add_job(

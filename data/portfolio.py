@@ -33,18 +33,29 @@ def _sl_pct(symbol: str) -> float:
 
 def _filter_valid_holdings(holdings: list[dict]) -> list[dict]:
     """
-    Filter out holdings with zero quantity (sold-out positions still in holdings list).
+    Filter out holdings with zero quantity, zero average price, or zero current price.
     
     Args:
         holdings: List of holding dicts from KiteClient.get_holdings()
     
     Returns:
-        Filtered list containing only holdings with quantity > 0
+        Filtered list containing only holdings with:
+        - quantity > 0 (shares exist)
+        - average_price > 0 (valid entry price)
+        - last_price > 0 (valid current price)
     """
-    valid = [h for h in holdings if h.get("quantity", 0) > 0]
+    valid = [
+        h for h in holdings
+        if h.get("quantity", 0) > 0
+        and h.get("average_price", 0) > 0
+        and h.get("last_price", 0) > 0
+    ]
     if len(valid) < len(holdings):
         filtered_out = len(holdings) - len(valid)
-        logger.info(f"Filtered out {filtered_out} holding(s) with 0 shares")
+        logger.warning(
+            f"Filtered out {filtered_out} holding(s): zero quantity, "
+            f"zero average_price, or zero last_price (migrated stocks)"
+        )
     return valid
 
 
@@ -64,8 +75,22 @@ def get_holdings_with_sl_status() -> list[dict]:
         qty: int   = h["quantity"]
         symbol: str = h["tradingsymbol"]
 
+        # Final defensive check: skip if avg or lp is zero/invalid
+        if avg <= 0 or lp <= 0:
+            logger.debug(f"Skipping {symbol}: avg={avg}, lp={lp}")
+            continue
+
         sl_pct_val = _sl_pct(symbol)
         sl_price = round(avg * (1 + sl_pct_val / 100), 2)
+        
+        # Ensure sl_price is valid and non-zero to prevent division by zero
+        if sl_price <= 0:
+            logger.warning(
+                f"Invalid SL price for {symbol}: avg={avg}, sl_pct={sl_pct_val}, "
+                f"sl_price={sl_price}. Skipping."
+            )
+            continue
+        
         sl_distance_pct = round(((lp - sl_price) / sl_price) * 100, 2)
 
         if sl_distance_pct < 0:
@@ -107,8 +132,13 @@ def get_portfolio_summary() -> dict:
     breach_count  = sum(1 for h in holdings if h["sl_status"] == "BREACH")
     warning_count = sum(1 for h in holdings if h["sl_status"] == "WARNING")
 
-    top_gainer: dict = max(holdings, key=lambda h: h["pnl_pct"])
-    top_loser:  dict = min(holdings, key=lambda h: h["pnl_pct"])
+    # Handle edge case: no valid holdings after filtering
+    if holdings:
+        top_gainer: dict = max(holdings, key=lambda h: h["pnl_pct"])
+        top_loser:  dict = min(holdings, key=lambda h: h["pnl_pct"])
+    else:
+        top_gainer = {}
+        top_loser = {}
 
     sector_weights: dict[str, float] = {}
     for h in holdings:

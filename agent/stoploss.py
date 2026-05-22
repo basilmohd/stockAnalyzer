@@ -48,6 +48,8 @@ def check_holdings_for_sl() -> list[SLBreachAlert]:
       BREACH  — pnl_pct <= threshold
       WARNING — pnl_pct <= threshold + 3  (within 3 percentage points of SL)
     Results are sorted worst-first (ascending pnl_pct).
+    
+    Skips holdings with zero average_price to avoid division by zero.
     """
     holdings = get_holdings_with_sl_status()
     alerts: list[SLBreachAlert] = []
@@ -57,6 +59,11 @@ def check_holdings_for_sl() -> list[SLBreachAlert]:
         avg: float = h["average_price"]
         lp: float = h["last_price"]
         qty: int = h["quantity"]
+
+        # Skip stocks with zero average price (migrated from other brokers)
+        if avg <= 0:
+            logger.debug(f"Skipping SL check for {symbol}: average_price is {avg}")
+            continue
 
         threshold = get_sl_threshold(symbol)
         sl_price = round(avg * (1 + threshold / 100), 2)
@@ -125,7 +132,7 @@ async def run_sl_monitor() -> dict:
             logger.info("SL: %s on cooldown, skipping", alert.symbol)
             continue
 
-        token = generate_token("STOPLOSS")
+        token = generate_token("STOPLOSS", symbol=alert.symbol)
 
         await send_sl_breach_alert(
             symbol=alert.symbol,

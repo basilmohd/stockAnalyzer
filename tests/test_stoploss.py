@@ -165,7 +165,7 @@ async def test_run_sl_monitor_sends_alert_with_token():
          patch("agent.stoploss.send_sl_breach_alert", new_callable=AsyncMock, return_value=True) as mock_tg:
         await run_sl_monitor()
 
-    mock_gen.assert_called_once_with("STOPLOSS")
+    mock_gen.assert_called_once_with("STOPLOSS", symbol="TATAMTRDVR")
     call_kwargs = mock_tg.call_args.kwargs
     assert call_kwargs["token"] == "test-token-xyz"
     assert call_kwargs["symbol"] == "TATAMTRDVR"

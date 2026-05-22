@@ -20,6 +20,7 @@ class Approval(Base):
         Integer, ForeignKey("signals.id"), nullable=True
     )
     action_type: Mapped[str] = mapped_column(String, nullable=False)  # SIGNAL/STOPLOSS
+    symbol: Mapped[str | None] = mapped_column(String, nullable=True)  # For STOPLOSS actions
     status: Mapped[str] = mapped_column(String, default="PENDING", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

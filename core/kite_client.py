@@ -127,20 +127,35 @@ class KiteClient:
             raise
 
     def _normalize_holdings(self, raw_list: list[dict]) -> list[dict]:
-        """Normalize Kite raw holdings to our standard format."""
+        """Normalize Kite raw holdings to our standard format.
+        
+        Filters out holdings with zero quantity, zero average price, or zero current price
+        to prevent division by zero errors in downstream calculations.
+        """
         holdings = []
         for raw in raw_list:
+            qty = raw.get("quantity", 0)
             avg = raw.get("average_price", 0.0)
             lp = raw.get("last_price", 0.0)
-            pnl = raw.get("pnl", (lp - avg) * raw.get("quantity", 0))
+            symbol = raw.get("tradingsymbol", "")
+            
+            # Skip holdings with zero quantity or zero prices (migrated stocks)
+            if qty <= 0 or avg <= 0 or lp <= 0:
+                logger.debug(
+                    f"Skipping {symbol}: qty={qty}, avg={avg}, lp={lp} (migrated/invalid stock)"
+                )
+                continue
+            
+            pnl = raw.get("pnl", (lp - avg) * qty)
+            # Safe pnl_pct calculation with zero check
             pnl_pct = raw.get(
                 "pnl_pct",
-                ((lp - avg) / avg * 100) if avg else 0.0,
+                ((lp - avg) / avg * 100) if avg > 0 else 0.0,
             )
             holdings.append({
-                "tradingsymbol":    raw.get("tradingsymbol", ""),
+                "tradingsymbol":    symbol,
                 "exchange":         raw.get("exchange", "NSE"),
-                "quantity":         raw.get("quantity", 0),
+                "quantity":         qty,
                 "average_price":    avg,
                 "last_price":       lp,
                 "pnl":              round(pnl, 2),

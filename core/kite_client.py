@@ -295,6 +295,7 @@ class KiteClient:
                 order_type=KiteConnect.ORDER_TYPE_MARKET,
                 product=KiteConnect.PRODUCT_CNC,
                 variety=KiteConnect.VARIETY_REGULAR,
+                market_protection=-1,  # Automatic market protection by system
             )
 
             return {

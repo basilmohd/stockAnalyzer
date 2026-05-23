@@ -3,7 +3,7 @@ uvicorn==0.30.0
 apscheduler==3.10.4
 sqlalchemy==2.0.36
 redis==5.0.8
-kiteconnect==4.2.0
+kiteconnect>=5.0.0
 anthropic==0.40.0
 openai>=1.30.0
 python-telegram-bot==22.7

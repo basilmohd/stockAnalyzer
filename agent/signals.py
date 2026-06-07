@@ -3,6 +3,8 @@ import json
 from datetime import datetime, timezone
 
 import config
+from agent.portfolio_guard import check_guards
+from agent.sizing import calculate_position
 from agent.strategy import classify_strategy, validate_entry
 from core.approval import generate_token
 from core.db import get_db
@@ -74,8 +76,14 @@ def _write_action_log(
     rejection_reason: str | None = None,
     signal_id: int | None = None,
     telegram_sent_at: datetime | None = None,
+    suggested_qty: int | None = None,
 ) -> None:
-    """Persist an ActionLog record to SQLite."""
+    """Persist an ActionLog record to SQLite.
+
+    *suggested_qty* (the risk-sized quantity) takes precedence; when omitted it
+    falls back to any 'suggested_quantity' carried on the signal dict.
+    """
+    qty = suggested_qty if suggested_qty is not None else signal.get("suggested_quantity")
     with get_db() as db:
         record = ActionLog(
             signal_id=signal_id,
@@ -84,7 +92,7 @@ def _write_action_log(
             signal_action=signal.get("action", "").upper(),
             confidence=float(signal.get("confidence", 0.0)),
             entry_price=current_price,
-            suggested_qty=signal.get("suggested_quantity"),
+            suggested_qty=qty,
             suggested_sl=suggested_sl,
             suggested_target=suggested_target,
             action_taken=action_taken,
@@ -190,7 +198,7 @@ def _store_single_signal(signal: dict) -> int:
             action=signal.get("action", ""),
             confidence=float(signal.get("confidence", 0.0)),
             reasoning=signal.get("reason", ""),
-            suggested_qty=signal.get("suggested_quantity"),
+            suggested_qty=signal.get("quantity") or signal.get("suggested_quantity"),
             status="PENDING",
         )
         db.add(record)
@@ -258,6 +266,20 @@ def format_signal_telegram(signal: dict) -> str:
     if suggested_target or suggested_sl:
         lines.append("")
 
+    quantity = signal.get("quantity")
+    position_value = signal.get("position_value")
+    capital_used_pct = signal.get("capital_used_pct")
+    max_loss = signal.get("max_loss")
+    max_loss_pct = signal.get("max_loss_pct")
+    if quantity:
+        lines += [
+            "💰 <b>Position:</b>",
+            f"Qty: {quantity} shares",
+            f"Value: ₹{(position_value or 0):.0f} ({(capital_used_pct or 0):.0%} of capital)",
+            f"Max Loss: ₹{(max_loss or 0):.0f} ({(max_loss_pct or 0):.1%})",
+            "",
+        ]
+
     lines += [
         f"💡 {reason}",
         f"Urgency: {urgency}",
@@ -284,6 +306,7 @@ async def send_signal_alerts(signals: list[dict]) -> None:
             text = format_signal_telegram(signal)
 
             signal_id = _store_single_signal(signal)
+            signal["signal_id"] = signal_id  # link back so the PENDING ActionLog can reference it
             token = generate_token("SIGNAL", signal_id=signal_id)
 
             btn_execute = InlineKeyboardButton("✅ EXECUTE", callback_data=f"execute:{token}")
@@ -305,14 +328,20 @@ async def send_signal_alerts(signals: list[dict]) -> None:
 
 
 async def run_signal_pipeline() -> dict:
-    """Orchestrate the full signal pipeline: scan → classify → validate → alert → cache.
+    """Orchestrate the full pipeline: scan → classify → validate → size → guard → alert → cache.
 
-    Each signal is classified into a strategy, validated against entry rules, and either
-    rejected (AUTO_REJECTED ActionLog, no Telegram) or enriched with SL/target prices
-    before being sent as a Telegram approval request (PENDING ActionLog).
+    Each signal is classified into a strategy and validated against entry rules. A
+    validated entry is then sized (agent.sizing.calculate_position) and run through the
+    hard portfolio guards (agent.portfolio_guard.check_guards). It is rejected at any
+    stage with an AUTO_REJECTED ActionLog and no Telegram; survivors are enriched with
+    quantity/SL/target and sent as a Telegram approval request.
 
-    Returns summary dict: {scanned, filtered, validated, rejected, alerts_sent, run_at}.
-    Caches the summary in Redis under 'signals:last_run' with 2-hour TTL.
+    The PENDING ActionLog is written only after send_signal_alerts() returns without
+    raising; if the send raises, the row is written as SEND_FAILED with no
+    telegram_sent_at so the audit log never shows a PENDING alert that never went out.
+
+    Returns summary dict: {scanned, filtered, validated, rejected, alerts_sent,
+    send_failed, run_at}. Caches the summary in Redis under 'signals:last_run' (2h TTL).
     """
     raw = run_signal_scan()
     filtered = filter_signals(raw)
@@ -365,11 +394,56 @@ async def run_signal_pipeline() -> dict:
         enriched["suggested_sl"] = suggested_sl
         enriched["suggested_target"] = suggested_target
         enriched["current_price"] = current_price
+
+        # EXIT_SIGNAL (and any strategy without an entry SL) is not a new position —
+        # skip sizing/guards and alert as-is.
+        if suggested_sl is None:
+            validated_signals.append(enriched)
+            continue
+
+        # ── Position sizing + hard portfolio guards (before any alert) ──────────
+        position = calculate_position(
+            entry_price=current_price,
+            stop_loss_price=suggested_sl,
+            strategy_type=strategy,
+        )
+        guard_ok, guard_reason = check_guards(enriched, position)
+
+        if not guard_ok:
+            rejected_count += 1
+            logger.info("%s blocked by guard: %s", symbol, guard_reason)
+            _write_action_log(
+                signal=enriched,
+                strategy_type=strategy,
+                action_taken="AUTO_REJECTED",
+                current_price=current_price,
+                suggested_sl=suggested_sl,
+                suggested_target=suggested_target,
+                rejection_reason=guard_reason,
+                suggested_qty=position.get("quantity"),
+            )
+            continue
+
+        enriched["quantity"] = position["quantity"]
+        enriched["position_value"] = position["position_value"]
+        enriched["max_loss"] = position["max_loss"]
+        enriched["max_loss_pct"] = position["max_loss_pct"]
+        enriched["capital_used_pct"] = position["capital_used_pct"]
         validated_signals.append(enriched)
 
-    await send_signal_alerts(validated_signals)
+    # Only record PENDING if the alert actually went out. If send_signal_alerts
+    # raises, record SEND_FAILED (with no telegram_sent_at) so the audit log
+    # reflects reality — never a PENDING row for an alert that never sent.
+    send_failed = False
+    try:
+        await send_signal_alerts(validated_signals)
+    except Exception:
+        send_failed = True
+        logger.exception(
+            "send_signal_alerts raised — marking %d signal(s) SEND_FAILED",
+            len(validated_signals),
+        )
 
-    # Write PENDING ActionLog for every alert sent (signal_id populated after send)
     now = datetime.now(timezone.utc)
     for signal in validated_signals:
         symbol = signal.get("symbol", "")
@@ -380,11 +454,13 @@ async def run_signal_pipeline() -> dict:
         _write_action_log(
             signal=signal,
             strategy_type=signal.get("strategy_type", ""),
-            action_taken="PENDING",
+            action_taken="SEND_FAILED" if send_failed else "PENDING",
             current_price=current_price,
             suggested_sl=signal.get("suggested_sl"),
             suggested_target=signal.get("suggested_target"),
-            telegram_sent_at=now,
+            telegram_sent_at=None if send_failed else now,
+            signal_id=signal.get("signal_id"),
+            suggested_qty=signal.get("quantity"),
         )
 
     result = {
@@ -392,7 +468,8 @@ async def run_signal_pipeline() -> dict:
         "filtered": len(filtered),
         "validated": len(validated_signals),
         "rejected": rejected_count,
-        "alerts_sent": len(validated_signals),
+        "alerts_sent": 0 if send_failed else len(validated_signals),
+        "send_failed": send_failed,
         "run_at": datetime.now().isoformat(),
     }
 

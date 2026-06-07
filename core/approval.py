@@ -48,6 +48,7 @@ def generate_token(
 
 def validate_token(token: str) -> dict:
     """Check whether a token is valid and still PENDING. Returns a result dict."""
+    expired_signal_id: int | None = None
     with get_db() as db:
         approval = db.query(Approval).filter(Approval.token == token).first()
 
@@ -59,17 +60,23 @@ def validate_token(token: str) -> dict:
 
         if approval.expires_at.replace(tzinfo=IST) < datetime.now(IST):
             approval.status = "EXPIRED"
+            expired_signal_id = approval.signal_id
             db.commit()
-            return {"valid": False, "reason": "Token expired"}
+        else:
+            return {
+                "valid": True,
+                "token": token,
+                "action_type": approval.action_type,
+                "signal_id": approval.signal_id,
+                "symbol": approval.symbol,
+                "expires_at": str(approval.expires_at),
+            }
 
-        return {
-            "valid": True,
-            "token": token,
-            "action_type": approval.action_type,
-            "signal_id": approval.signal_id,
-            "symbol": approval.symbol,
-            "expires_at": str(approval.expires_at),
-        }
+    # Reached only on lazy expiry — journal the EXPIRED outcome after the session closes.
+    if expired_signal_id is not None:
+        from agent.journal import update_action_log
+        update_action_log(expired_signal_id, "EXPIRED")
+    return {"valid": False, "reason": "Token expired"}
 
 
 def mark_approved(token: str) -> bool:
@@ -103,6 +110,7 @@ def mark_skipped(token: str) -> bool:
 def cleanup_expired_tokens() -> int:
     """Mark all PENDING tokens past their expiry as EXPIRED. Returns count cleaned up."""
     now = datetime.now(IST)
+    signal_ids: list[int | None] = []
     with get_db() as db:
         expired = (
             db.query(Approval)
@@ -111,8 +119,15 @@ def cleanup_expired_tokens() -> int:
         )
         for record in expired:
             record.status = "EXPIRED"
+            signal_ids.append(record.signal_id)
         db.commit()
         count = len(expired)
+
+    if signal_ids:
+        from agent.journal import update_action_log
+        for sid in signal_ids:
+            if sid is not None:
+                update_action_log(sid, "EXPIRED")
 
     logger.info("Cleaned up %d expired tokens", count)
     return count

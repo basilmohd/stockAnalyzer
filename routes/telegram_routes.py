@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 
+from agent.journal import update_action_log
 from core.approval import mark_approved, mark_skipped, validate_token
 from core.telegram_bot import get_bot, send_alert, send_message
 from core.exception_handler import safe_run
@@ -48,6 +49,7 @@ async def telegram_webhook(request: Request) -> dict:
                 await _answer_callback_query(query_id, f"❌ {result['reason']}")
             else:
                 mark_approved(token)
+                update_action_log(token, "APPROVED")
                 redis.set(f"approved:{token}", "1")
                 await _answer_callback_query(query_id, "✅ Approved! Order will be placed shortly.")
                 await send_alert(
@@ -69,6 +71,7 @@ async def telegram_webhook(request: Request) -> dict:
                 await _answer_callback_query(query_id, f"❌ {result['reason']}")
             else:
                 mark_skipped(token)
+                update_action_log(token, "SKIPPED")
                 await _answer_callback_query(query_id, "⏭ Skipped.")
                 await send_alert(
                     "Signal Skipped",

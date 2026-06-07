@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
+from agent.journal import update_action_log
 from core.approval import mark_approved, mark_skipped, validate_token
 from core.db import get_db
 from core.telegram_bot import send_alert
@@ -163,6 +164,8 @@ async def handle_signal_execution(token: str) -> dict:
             db.commit()
 
         mark_approved(token)
+        # Record the user's APPROVE on the signal's ActionLog (Trade creation: Week 10).
+        update_action_log(signal_id, "APPROVED")
 
         await send_alert(
             "Order Executed",
@@ -205,6 +208,7 @@ async def approve_signal(
 
     if action == "approve":
         mark_approved(token)
+        update_action_log(token, "APPROVED")
         await send_alert(
             "Order Approved",
             f"Token {token[:8]}... approved via HTTP fallback. Execution in progress.",
@@ -216,6 +220,7 @@ async def approve_signal(
         )
 
     mark_skipped(token)
+    update_action_log(token, "SKIPPED")
     await send_alert(
         "Signal Skipped",
         f"Token {token[:8]}... skipped via HTTP fallback.",

@@ -33,11 +33,25 @@ TIMEZONE = "Asia/Kolkata"
 # ── Risk Rules ────────────────────────────────────────────────────────────────
 DEFAULT_SL_PCT = -15.0          # Stop loss: -15% from entry price
 CONFIDENCE_THRESHOLD = 0.75    # Only alert signals above 75% confidence
-MAX_POSITION_PCT = 20.0        # No single stock > 20% of portfolio
-CASH_RESERVE_PCT = 10.0        # Always keep 10% cash
+MAX_HOLDING_WEIGHT_PCT = 20.0  # Reporting: flag a holding over 20% of current portfolio value (percent-scale)
 APPROVAL_EXPIRY_MINS = 30      # Signal approval expires in 30 minutes
 SL_APPROVAL_EXPIRY_MINS = 15   # SL breach approval expires in 15 minutes
 SL_COOLDOWN_MINS = 30          # Don't re-alert same stock within 30 min
+
+# ── Capital & Position Sizing ─────────────────────────────────────────────────
+# NOTE: MAX_POSITION_PCT and CASH_RESERVE_PCT are FRACTIONS (0.25 = 25%), used by
+# the Week 9 sizing engine (agent/sizing.py) and portfolio guard against TOTAL_CAPITAL.
+# This is distinct from the percent-scale MAX_HOLDING_WEIGHT_PCT (Risk Rules), which
+# drives portfolio-concentration reporting in data/portfolio.py and agent/health.py.
+TOTAL_CAPITAL = float(os.getenv("TOTAL_CAPITAL", "25000"))          # Deployable trading capital (₹)
+MAX_RISK_PER_TRADE = float(os.getenv("MAX_RISK_PER_TRADE", "0.02"))  # Risk 2% of capital per trade
+MAX_POSITION_PCT = float(os.getenv("MAX_POSITION_PCT", "0.25"))      # Max 25% of capital in one position
+CASH_RESERVE_PCT = float(os.getenv("CASH_RESERVE_PCT", "0.20"))      # Always keep 20% cash reserve
+MAX_OPEN_POSITIONS = int(os.getenv("MAX_OPEN_POSITIONS", "4"))       # Max concurrent open positions
+MAX_SAME_SECTOR = int(os.getenv("MAX_SAME_SECTOR", "2"))             # Max open positions per sector
+WEEKLY_LOSS_LIMIT = float(os.getenv("WEEKLY_LOSS_LIMIT", "0.05"))    # Pause trading after 5% weekly loss
+MIN_ORDER_VALUE = float(os.getenv("MIN_ORDER_VALUE", "2000"))        # Skip orders below ₹2000
+
 # ── Cache Settings ────────────────────────────────────────────────────────────
 HOLDINGS_CACHE_TTL = 60         # Holdings cache TTL in seconds (1 minute for fresher SL monitoring)
 # ── Per-stock SL overrides (symbol: pct) ─────────────────────────────────────

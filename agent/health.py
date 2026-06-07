@@ -74,7 +74,7 @@ def _score_diversification(holdings: list[dict]) -> dict:
     else:
         base = 5
 
-    overweight = any((h.get("weight_pct") or 0) > config.MAX_POSITION_PCT for h in holdings)
+    overweight = any((h.get("weight_pct") or 0) > config.MAX_HOLDING_WEIGHT_PCT for h in holdings)
     penalty = 5 if overweight else 0
     score = max(0, base - penalty)
 

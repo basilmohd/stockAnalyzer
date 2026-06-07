@@ -209,6 +209,39 @@ def action_log_stats() -> dict:
     return {action: count for action, count in rows}
 
 
+@app.get("/sizing/preview")
+def sizing_preview(
+    symbol: str, entry: float, sl: float, strategy: str = "SWING_TRADE"
+) -> dict:
+    """Preview the position-sizing math for a hypothetical entry — no scan, no order.
+
+    Example:
+        /sizing/preview?symbol=INFY&entry=1500&sl=1440&strategy=SWING_TRADE
+    """
+    from agent.sizing import calculate_position
+    position = calculate_position(
+        entry_price=entry, stop_loss_price=sl, strategy_type=strategy
+    )
+    return {
+        "symbol": symbol.upper(),
+        "entry": entry,
+        "stop_loss": sl,
+        "strategy": strategy,
+        "position": position,
+    }
+
+
+@app.get("/guard/status")
+def guard_status() -> dict:
+    """One-glance portfolio guard state: open positions + deployable capital."""
+    from agent.portfolio_guard import get_open_positions_summary
+    from agent.sizing import get_available_capital
+    return {
+        "open_positions": get_open_positions_summary(),
+        "capital": get_available_capital(),
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
 

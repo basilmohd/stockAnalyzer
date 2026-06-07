@@ -151,6 +151,22 @@ Week 7 COMPLETE ✓ — MVP1 DONE
 - tests/test_week7.py: 13 new tests — screener filters, opportunity scan, health score, safe_run
 - 118/119 tests passing (1 skipped — placeholder ANTHROPIC_API_KEY integration test)
 
+Week 8 COMPLETE ✓
+- agent/strategy.py: classify_strategy (MEAN_REVERSION/SWING_TRADE/TREND_FOLLOW/EXIT_SIGNAL/NO_TRADE) + validate_entry rules; SECTOR_MAP, NIFTY50_SYMBOLS
+- models/action_log.py: ActionLog audit model (strategy_type, suggested_sl/target, action_taken, rejection_reason, response_time_sec)
+- agent/signals.py: pipeline classifies + validates each signal → AUTO_REJECTED / PENDING ActionLog; signals carry strategy_type, suggested_sl, suggested_target
+- tests/test_week8.py: 10 tests — classifier, validator, ActionLog DB writes
+
+Week 9 COMPLETE ✓
+- core/exception_handler.py: safe_run hardened — logger.exception full traceback + root logs/errors.log handler (WARNING+ from ALL loggers); Telegram alert carries exc type + first 200 chars; "[job] completed OK" on success
+- config.py: TOTAL_CAPITAL, MAX_RISK_PER_TRADE, MAX_POSITION_PCT (0.25), CASH_RESERVE_PCT (0.20), MAX_OPEN_POSITIONS, MAX_SAME_SECTOR, WEEKLY_LOSS_LIMIT, MIN_ORDER_VALUE; MAX_HOLDING_WEIGHT_PCT (percent-scale reporting, separate from the sizing cap)
+- agent/sizing.py: calculate_position (risk-based qty, 25% cap, min-order guard) + get_available_capital (cash reserve); reads config.* at call time
+- agent/portfolio_guard.py: check_guards (6 ordered hard limits) + get_open_positions_summary (APPROVED-ActionLog proxy; TODO Trade table Wk10)
+- agent/signals.py: pipeline sizes + guards each entry; guard-blocked → AUTO_REJECTED (no Telegram); PENDING written only after send confirmed, else SEND_FAILED; 💰 Position block added to Telegram alert
+- agent/journal.py: update_action_log(signal_id_or_token, action_taken) flips PENDING ActionLog → APPROVED/SKIPPED/EXPIRED with response_time_sec; wired into approval + telegram routes and token expiry
+- webhook_server.py: GET /sizing/preview, GET /guard/status debug endpoints
+- tests/test_week9.py: 13 tests (10 spec + 3 regression extras); full suite 185 passed / 2 skipped
+
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday
 - Exchange: NSE

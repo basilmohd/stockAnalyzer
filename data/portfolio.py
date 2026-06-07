@@ -5,7 +5,7 @@ and produces structured data for Claude prompts.
 from datetime import datetime
 from typing import Optional
 
-from config import DEFAULT_SL_PCT, MAX_POSITION_PCT, SL_OVERRIDES
+from config import DEFAULT_SL_PCT, MAX_HOLDING_WEIGHT_PCT, SL_OVERRIDES
 from core.kite_client import KiteClient
 from core.logger import get_logger
 
@@ -207,9 +207,9 @@ def build_claude_context() -> dict:
                 f"{sym} is {dist:.1f}% above stop-loss — approaching trigger"
             )
 
-        if wt is not None and wt > MAX_POSITION_PCT:
+        if wt is not None and wt > MAX_HOLDING_WEIGHT_PCT:
             risk_flags.append(
-                f"{sym} exceeds {MAX_POSITION_PCT:.0f}% portfolio weight at {wt:.1f}%"
+                f"{sym} exceeds {MAX_HOLDING_WEIGHT_PCT:.0f}% portfolio weight at {wt:.1f}%"
             )
 
     return {

@@ -53,6 +53,7 @@ def init_db() -> None:
     import models.order           # noqa: F401
     import models.approval        # noqa: F401
     import models.portfolio_snap  # noqa: F401
+    import models.action_log      # noqa: F401
 
     Base.metadata.create_all(engine)
     _add_column_if_missing("portfolio_snapshots", "health_score_json", "health_score_json TEXT")

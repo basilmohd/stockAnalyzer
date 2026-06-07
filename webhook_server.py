@@ -163,6 +163,52 @@ async def refresh_holdings_endpoint():
         "message": "Holdings cache refreshed"
     }
 
+@app.get("/action-log")
+def action_log_list() -> list:
+    """Return the last 20 ActionLog records ordered by created_at DESC."""
+    from core.db import get_db
+    from models.action_log import ActionLog as ActionLogModel
+    with get_db() as db:
+        records = (
+            db.query(ActionLogModel)
+            .order_by(ActionLogModel.created_at.desc())
+            .limit(20)
+            .all()
+        )
+    return [
+        {
+            "id": r.id,
+            "symbol": r.symbol,
+            "strategy_type": r.strategy_type,
+            "signal_action": r.signal_action,
+            "confidence": r.confidence,
+            "entry_price": r.entry_price,
+            "suggested_sl": r.suggested_sl,
+            "suggested_target": r.suggested_target,
+            "action_taken": r.action_taken,
+            "rejection_reason": r.rejection_reason,
+            "telegram_sent_at": r.telegram_sent_at.isoformat() if r.telegram_sent_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in records
+    ]
+
+
+@app.get("/action-log/stats")
+def action_log_stats() -> dict:
+    """Return counts of ActionLog records grouped by action_taken."""
+    from sqlalchemy import func
+    from core.db import get_db
+    from models.action_log import ActionLog as ActionLogModel
+    with get_db() as db:
+        rows = (
+            db.query(ActionLogModel.action_taken, func.count(ActionLogModel.id))
+            .group_by(ActionLogModel.action_taken)
+            .all()
+        )
+    return {action: count for action, count in rows}
+
+
 if __name__ == "__main__":
     import uvicorn
 

@@ -1,15 +1,17 @@
 """Signal generation engine — AI-driven BUY/SELL/REDUCE/EXIT for NSE holdings."""
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import config
+from agent.strategy import classify_strategy, validate_entry
 from core.approval import generate_token
 from core.db import get_db
 from core.redis_client import RedisClient
 from core.telegram_bot import get_bot
 from data.news import get_news_sentiment_all_holdings
 from data.portfolio import build_claude_context
-from data.technicals import get_technicals_for_holdings
+from data.technicals import IndicatorResult, get_technicals_for_holdings
+from models.action_log import ActionLog
 from models.signal import Signal
 
 from core.logger import get_logger
@@ -22,6 +24,75 @@ _ACTION_EMOJI: dict[str, str] = {
     "REDUCE": "🟡",
     "EXIT": "⛔",
 }
+
+_STRATEGY_EMOJI: dict[str, str] = {
+    "MEAN_REVERSION": "🔄",
+    "SWING_TRADE": "🏹",
+    "TREND_FOLLOW": "📈",
+    "EXIT_SIGNAL": "📤",
+}
+
+SL_BY_STRATEGY: dict[str, float | None] = {
+    "MEAN_REVERSION": 0.05,
+    "SWING_TRADE": 0.04,
+    "TREND_FOLLOW": 0.05,
+    "EXIT_SIGNAL": None,
+}
+
+TARGET_BY_STRATEGY: dict[str, float | None] = {
+    "MEAN_REVERSION": 0.08,
+    "SWING_TRADE": 0.07,
+    "TREND_FOLLOW": 0.12,
+    "EXIT_SIGNAL": None,
+}
+
+
+def _indicator_to_technicals(ind: IndicatorResult) -> dict:
+    """Convert IndicatorResult to the flat technicals dict expected by strategy functions."""
+    return {
+        "rsi": ind.rsi,
+        "sma_50": ind.sma_50,
+        "sma_200": ind.sma_200,
+        "current_price": ind.last_close,
+        "macd": {
+            "macd": ind.macd,
+            "histogram": round(ind.macd - ind.macd_signal, 4),
+        },
+        "volume_ratio": ind.volume_ratio,
+        "pct_from_52w_high": ind.price_vs_52w_high_pct,
+        "above_200dma": ind.above_200sma,
+    }
+
+
+def _write_action_log(
+    signal: dict,
+    strategy_type: str,
+    action_taken: str,
+    current_price: float,
+    suggested_sl: float | None,
+    suggested_target: float | None,
+    rejection_reason: str | None = None,
+    signal_id: int | None = None,
+    telegram_sent_at: datetime | None = None,
+) -> None:
+    """Persist an ActionLog record to SQLite."""
+    with get_db() as db:
+        record = ActionLog(
+            signal_id=signal_id,
+            symbol=signal.get("symbol", ""),
+            strategy_type=strategy_type,
+            signal_action=signal.get("action", "").upper(),
+            confidence=float(signal.get("confidence", 0.0)),
+            entry_price=current_price,
+            suggested_qty=signal.get("suggested_quantity"),
+            suggested_sl=suggested_sl,
+            suggested_target=suggested_target,
+            action_taken=action_taken,
+            rejection_reason=rejection_reason,
+            telegram_sent_at=telegram_sent_at,
+        )
+        db.add(record)
+        db.commit()
 
 
 def run_signal_scan() -> list[dict]:
@@ -134,6 +205,7 @@ def _store_single_signal(signal: dict) -> int:
 def format_signal_telegram(signal: dict) -> str:
     """Format a single signal as an HTML string for Telegram.
 
+    Includes strategy type, target, and stop-loss prices when available.
     Confidence bar uses 5 filled/empty blocks (e.g. ████░ 80%).
     """
     symbol = signal.get("symbol", "?")
@@ -144,8 +216,13 @@ def format_signal_telegram(signal: dict) -> str:
     macd_histogram = signal.get("macd_histogram", "N/A")
     news_sentiment = signal.get("news_sentiment", "NEUTRAL")
     urgency = signal.get("urgency", "MEDIUM")
+    strategy_type = signal.get("strategy_type", "")
+    suggested_target = signal.get("suggested_target")
+    suggested_sl = signal.get("suggested_sl")
+    current_price = signal.get("current_price", 0.0)
 
-    emoji = _ACTION_EMOJI.get(action, "📊")
+    action_emoji = _ACTION_EMOJI.get(action, "📊")
+    strategy_emoji = _STRATEGY_EMOJI.get(strategy_type, "")
     filled = round(confidence * 5)
     bar = "█" * filled + "░" * (5 - filled)
     confidence_pct = round(confidence * 100)
@@ -153,19 +230,40 @@ def format_signal_telegram(signal: dict) -> str:
     rsi_str = f"{rsi:.1f}" if isinstance(rsi, (int, float)) else str(rsi)
     macd_str = f"{macd_histogram:.2f}" if isinstance(macd_histogram, (int, float)) else str(macd_histogram)
 
-    return (
-        f"🔔 <b>Signal Alert — {symbol}</b>\n"
-        f"\n"
-        f"Action: {emoji} <b>{action}</b>\n"
-        f"Confidence: {bar} {confidence_pct}%\n"
-        f"\n"
-        f"📊 RSI: {rsi_str} | MACD: {macd_str}\n"
-        f"📰 News: {news_sentiment}\n"
-        f"\n"
-        f"💡 {reason}\n"
-        f"\n"
-        f"Urgency: {urgency}"
-    )
+    lines = [
+        f"🔔 <b>Signal Alert — {symbol}</b>",
+        "",
+    ]
+
+    if strategy_type:
+        lines.append(f"Strategy: {strategy_emoji} {strategy_type}")
+
+    lines += [
+        f"Action: {action_emoji} <b>{action}</b>",
+        f"Confidence: {bar} {confidence_pct}%",
+        "",
+        f"📊 RSI: {rsi_str} | MACD: {macd_str}",
+        f"📰 News: {news_sentiment}",
+        "",
+    ]
+
+    if suggested_target and current_price:
+        target_pct = round(((suggested_target - current_price) / current_price) * 100, 1)
+        lines.append(f"🎯 Target: ₹{suggested_target:.2f} (+{target_pct}%)")
+
+    if suggested_sl and current_price:
+        sl_pct = round(((current_price - suggested_sl) / current_price) * 100, 1)
+        lines.append(f"🛡 Stop Loss: ₹{suggested_sl:.2f} (-{sl_pct}%)")
+
+    if suggested_target or suggested_sl:
+        lines.append("")
+
+    lines += [
+        f"💡 {reason}",
+        f"Urgency: {urgency}",
+    ]
+
+    return "\n".join(lines)
 
 
 async def send_signal_alerts(signals: list[dict]) -> None:
@@ -207,19 +305,94 @@ async def send_signal_alerts(signals: list[dict]) -> None:
 
 
 async def run_signal_pipeline() -> dict:
-    """Orchestrate the full signal pipeline: scan → filter → alert → cache result.
+    """Orchestrate the full signal pipeline: scan → classify → validate → alert → cache.
 
-    Returns summary dict: {scanned, filtered, alerts_sent, run_at}.
+    Each signal is classified into a strategy, validated against entry rules, and either
+    rejected (AUTO_REJECTED ActionLog, no Telegram) or enriched with SL/target prices
+    before being sent as a Telegram approval request (PENDING ActionLog).
+
+    Returns summary dict: {scanned, filtered, validated, rejected, alerts_sent, run_at}.
     Caches the summary in Redis under 'signals:last_run' with 2-hour TTL.
     """
     raw = run_signal_scan()
     filtered = filter_signals(raw)
-    await send_signal_alerts(filtered)
+
+    technicals_map = get_technicals_for_holdings()
+    validated_signals: list[dict] = []
+    rejected_count = 0
+
+    for signal in filtered:
+        symbol = signal.get("symbol", "")
+
+        ind = technicals_map.get(symbol)
+        if ind is None or isinstance(ind, dict):
+            logger.debug("No valid technicals for %s — skipping strategy check", symbol)
+            validated_signals.append(signal)
+            continue
+
+        technicals = _indicator_to_technicals(ind)
+        current_price = technicals["current_price"]
+
+        strategy = classify_strategy(signal, technicals)
+
+        if strategy == "NO_TRADE":
+            logger.debug("%s classified NO_TRADE — skipping silently", symbol)
+            continue
+
+        passed, reason = validate_entry(strategy, signal, technicals)
+
+        if not passed:
+            rejected_count += 1
+            logger.info("%s rejected: %s", symbol, reason)
+            _write_action_log(
+                signal=signal,
+                strategy_type=strategy,
+                action_taken="AUTO_REJECTED",
+                current_price=current_price,
+                suggested_sl=None,
+                suggested_target=None,
+                rejection_reason=reason,
+            )
+            continue
+
+        sl_pct = SL_BY_STRATEGY.get(strategy)
+        target_pct = TARGET_BY_STRATEGY.get(strategy)
+        suggested_sl = round(current_price * (1 - sl_pct), 2) if sl_pct else None
+        suggested_target = round(current_price * (1 + target_pct), 2) if target_pct else None
+
+        enriched = dict(signal)
+        enriched["strategy_type"] = strategy
+        enriched["suggested_sl"] = suggested_sl
+        enriched["suggested_target"] = suggested_target
+        enriched["current_price"] = current_price
+        validated_signals.append(enriched)
+
+    await send_signal_alerts(validated_signals)
+
+    # Write PENDING ActionLog for every alert sent (signal_id populated after send)
+    now = datetime.now(timezone.utc)
+    for signal in validated_signals:
+        symbol = signal.get("symbol", "")
+        ind = technicals_map.get(symbol)
+        current_price = signal.get("current_price", 0.0)
+        if ind and not isinstance(ind, dict) and not current_price:
+            current_price = ind.last_close
+        _write_action_log(
+            signal=signal,
+            strategy_type=signal.get("strategy_type", ""),
+            action_taken="PENDING",
+            current_price=current_price,
+            suggested_sl=signal.get("suggested_sl"),
+            suggested_target=signal.get("suggested_target"),
+            telegram_sent_at=now,
+        )
 
     result = {
         "scanned": len(raw),
         "filtered": len(filtered),
-        "alerts_sent": len(filtered),
+        "validated": len(validated_signals),
+        "rejected": rejected_count,
+        "alerts_sent": len(validated_signals),
         "run_at": datetime.now().isoformat(),
     }
 

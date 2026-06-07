@@ -314,16 +314,16 @@ async def test_handle_chat_command_basic():
     redis.delete(f"chat:{user_id}:messages")
     
     with patch("config.USE_MOCK_AI", True), \
-         patch("core.telegram_bot.send_message") as mock_send:
-        
+         patch("routes.telegram_routes.send_message") as mock_send:
+
         mock_send.return_value = True
-        
+
         await _handle_chat_command(
             user_id=user_id,
             user_query="What is my portfolio risk?",
             redis=redis,
         )
-        
+
         # Verify send_message was called with response
         assert mock_send.called
 

@@ -151,6 +151,18 @@ def clear_holdings_cache(request: Request) -> dict:
         return {"status": "ok", "message": "Holdings cache was not present or Redis unavailable"}
 
 
+@app.post("/holdings/refresh")
+async def refresh_holdings_endpoint():
+    """On-demand holdings refresh."""
+    from core.exception_handler import safe_run
+    from data.portfolio import get_holdings_with_sl_status
+    
+    result = await safe_run("manual_holdings_refresh", get_holdings_with_sl_status)
+    return {
+        "status": "success" if result else "error",
+        "message": "Holdings cache refreshed"
+    }
+
 if __name__ == "__main__":
     import uvicorn
 

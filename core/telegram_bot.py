@@ -404,3 +404,44 @@ async def send_weekly_health_report(
         f"{rec_lines}"
     )
     return await send_message(text)
+
+
+async def send_long_message(text: str, max_chunk_size: int = 3500) -> list[bool]:
+    """Send a long message in chunks if it exceeds max_chunk_size.
+
+    Splits on markdown headers (##) to maintain readability.
+    Returns list of success flags per chunk (e.g., [True, True, False] for 3 chunks).
+    """
+    if len(text) <= max_chunk_size:
+        result = await send_message(text, parse_mode="HTML")
+        return [result]
+
+    # Split on markdown headers (##) to maintain section integrity
+    sections = text.split("\n## ")
+    chunks = []
+    current_chunk = ""
+
+    for i, section in enumerate(sections):
+        # Restore the ## prefix for non-first sections
+        section_text = ("## " + section) if i > 0 else section
+
+        if len(current_chunk) + len(section_text) <= max_chunk_size:
+            current_chunk += section_text
+        else:
+            if current_chunk:
+                chunks.append(current_chunk)
+            current_chunk = section_text
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    # Add chunk indicators and send
+    results = []
+    for i, chunk in enumerate(chunks):
+        chunk_indicator = f"\n\n*[{i + 1}/{len(chunks)}]*"
+        chunk_to_send = chunk + chunk_indicator
+        result = await send_message(chunk_to_send, parse_mode="HTML")
+        results.append(result)
+        logger.info("Telegram: sent chunk %d/%d (%d chars)", i + 1, len(chunks), len(chunk_to_send))
+
+    return results

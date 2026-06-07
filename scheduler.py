@@ -160,23 +160,29 @@ async def reset_daily_chat_counts_job() -> None:
 
 async def cleanup_expired_chat_sessions_job() -> None:
     """Clean up expired chat sessions from Redis (02:00 IST daily).
-    
+
     Removes stale chat history entries that may exceed TTL.
     """
     from core.redis_client import RedisClient
     from config import REDIS_URL
-    
+
     redis = RedisClient(REDIS_URL)
     if not redis.available:
         logger.warning("Redis unavailable — skipping chat session cleanup")
         return
-    
+
     try:
         # Redis handles TTL expiry automatically, so this is mostly preventive
         # In production, could add explicit scanning and cleanup if needed
         logger.info("Chat session cleanup completed (TTL-based expiry in effect)")
     except Exception as exc:
         logger.error("cleanup_expired_chat_sessions_job failed: %s", exc)
+
+
+async def global_research_job() -> None:
+    """Global market research: analyze international markets for weekly trends (Monday 8:15 AM IST)."""
+    from agent.global_research import run_global_market_research
+    await safe_run("global_research", run_global_market_research)
 
 
 async def main() -> None:
@@ -189,7 +195,7 @@ async def main() -> None:
     # ── 10-job schedule ───────────────────────────────────────────────────────
     scheduler.add_job(
         heartbeat_job,
-        CronTrigger(hour=8, minute=30, timezone=IST),
+        CronTrigger(hour=8, minute=00, timezone=IST),
         id="heartbeat", name="Daily Heartbeat",
     )
     scheduler.add_job(
@@ -276,6 +282,12 @@ async def main() -> None:
         CronTrigger(hour=2, minute=0, timezone=IST),
         id="cleanup_chat_sessions", name="Cleanup Chat Sessions (02:00 IST)",
         misfire_grace_time=3600,  # Allow up to 1 hour late execution
+    )
+    scheduler.add_job(
+        global_research_job,
+        CronTrigger(hour=8, minute=15, day_of_week="mon", timezone=IST),
+        id="global_research", name="Global Market Research (Mon 8:15 AM)",
+        misfire_grace_time=1800,  # Allow up to 30 minutes late execution
     )
 
     scheduler.start()

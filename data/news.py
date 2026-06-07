@@ -224,3 +224,76 @@ def get_news_sentiment_all_holdings() -> dict[str, dict]:
         articles = fetch_news_for_symbol(symbol)
         results[symbol] = compute_sentiment_score(articles)
     return results
+
+
+def fetch_index_news(index_name: str, days: int = 7) -> dict:
+    """Fetch news for market index (e.g., 'S&P 500', 'DAX', 'Nifty 50'), cached in Redis (TTL 7 days).
+
+    Returns: {index_name, articles, sentiment_label, article_count, fetched_at}.
+    """
+    cache_key = f"index_news:{index_name.replace(' ', '_')}"
+    cached = _redis.get(cache_key)
+    if cached:
+        logger.info("Index news cache hit: %s", index_name)
+        return json.loads(cached)
+
+    articles = _fetch_index_articles(index_name, days)
+    sentiment = compute_sentiment_score(articles)
+
+    result = {
+        "index_name": index_name,
+        "articles": articles,
+        "sentiment_label": sentiment["sentiment_label"],
+        "article_count": len(articles),
+        "fetched_at": datetime.utcnow().isoformat(),
+    }
+
+    try:
+        _redis.setex(cache_key, config.GLOBAL_RESEARCH_CACHE_TTL, json.dumps(result))
+    except Exception as exc:
+        logger.warning("Redis setex failed for %s: %s", cache_key, exc)
+
+    return result
+
+
+def _fetch_index_articles(index_name: str, days: int) -> list[dict]:
+    """Route to mock or live NewsAPI depending on USE_MOCK flag."""
+    if config.USE_MOCK:
+        from mocks.news_mock import get_mock_index_articles
+        return get_mock_index_articles(index_name, days)
+    return _fetch_index_articles_from_newsapi(index_name, days)
+
+
+def _fetch_index_articles_from_newsapi(index_name: str, days: int) -> list[dict]:
+    """Call NewsAPI for index news and return articles in normalised format (max 5)."""
+    try:
+        from newsapi import NewsApiClient
+        client = NewsApiClient(api_key=config.NEWS_API_KEY)
+        to_dt = datetime.utcnow()
+        from_dt = to_dt - timedelta(days=days)
+
+        # Query for index news with market forecast terms
+        query = f'"{index_name}" forecast stock market'
+        response = client.get_everything(
+            q=query,
+            from_param=from_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+            to=to_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+            language="en",
+            sort_by="publishedAt",
+            page_size=5,
+        )
+        raw = response.get("articles", [])[:5]
+    except Exception as exc:
+        logger.warning("NewsAPI fetch failed for index %s: %s", index_name, exc)
+        return []
+
+    return [
+        {
+            "title":        art.get("title", "") or "",
+            "summary":      art.get("description", "") or "",
+            "published_at": art.get("publishedAt", "") or "",
+            "source":       (art.get("source") or {}).get("name", "") or "",
+            "url":          art.get("url", "") or "",
+        }
+        for art in raw
+    ]

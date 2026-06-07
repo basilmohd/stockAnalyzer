@@ -416,3 +416,133 @@ def get_mock_news(symbol: str) -> dict[str, Any]:
         "sentiment_score": sentiment_score,
         "fetched_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+
+def get_mock_index_articles(index_name: str, days: int = 7) -> list[dict[str, str]]:
+    """Return mock news articles for market indices (S&P 500, DAX, Nifty 50, etc.)."""
+    index_articles = {
+        "S&P 500": [
+            {
+                "title": "S&P 500 rallies on post-FOMC dovish signals and strong tech earnings",
+                "summary": "Major indices surge as Federal Reserve signals potential rate pause; growth stocks lead",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Reuters",
+                "url": "https://example.com/sp500-rally",
+            },
+            {
+                "title": "US stock market reaches new record high on corporate profit beat",
+                "summary": "Tech and financials drive gains; market breadth improves significantly",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "CNBC",
+                "url": "https://example.com/sp500-record",
+            },
+        ],
+        "Dow Jones": [
+            {
+                "title": "Dow Jones industrial average climbs 500+ points on banking strength",
+                "summary": "Financial sector outperforms as lending conditions stabilize; yield curve flattens",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "MarketWatch",
+                "url": "https://example.com/dow-rise",
+            },
+            {
+                "title": "Blue-chip stocks maintain momentum amid positive macro data",
+                "summary": "Jobs report beats expectations; consumer spending remains resilient",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Bloomberg",
+                "url": "https://example.com/dow-momentum",
+            },
+        ],
+        "NASDAQ": [
+            {
+                "title": "NASDAQ 100 surges on AI optimism and mega-cap tech upgrades",
+                "summary": "Microsoft, Google, Meta benefit from AI enthusiasm; growth traders rotate back in",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "TradingView",
+                "url": "https://example.com/nasdaq-ai",
+            },
+            {
+                "title": "Tech stocks lead broader market gains on earnings surprises",
+                "summary": "Software and chip makers beat expectations; semiconductor sector rallies",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Yahoo Finance",
+                "url": "https://example.com/nasdaq-earnings",
+            },
+        ],
+        "DAX": [
+            {
+                "title": "DAX tumbles on European growth concerns amid ECB rate hold",
+                "summary": "German exporters weaken; fears of economic slowdown hit sentiment",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Deutsche Welle",
+                "url": "https://example.com/dax-decline",
+            },
+            {
+                "title": "European stocks under pressure as energy prices surge again",
+                "summary": "Oil rally weighs on consumer spending outlook; ECB faces inflation dilemma",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Financial Times",
+                "url": "https://example.com/dax-energy",
+            },
+        ],
+        "FTSE 100": [
+            {
+                "title": "FTSE 100 holds steady as UK inflation data meets expectations",
+                "summary": "Sterling strengthens on UK economic resilience; commodity stocks support index",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Reuters",
+                "url": "https://example.com/ftse-steady",
+            },
+            {
+                "title": "London markets buoyed by energy and banking sector strength",
+                "summary": "Oil and gas majors rally on production optimism; financial stocks support gains",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "BBC News",
+                "url": "https://example.com/ftse-energy",
+            },
+        ],
+        "Nifty 50": [
+            {
+                "title": "Nifty 50 scales new heights on FII buying and banking sector rally",
+                "summary": "Foreign investors increase India exposure; HDFC Bank, ICICI lead gains",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Economic Times",
+                "url": "https://example.com/nifty-fii",
+            },
+            {
+                "title": "Indian equities surge on monsoon prospects and IT sector optimism",
+                "summary": "Tech stocks gain as global IT spending improves; domestic consumption remains strong",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Moneycontrol",
+                "url": "https://example.com/nifty-monsoon",
+            },
+        ],
+        "Sensex": [
+            {
+                "title": "Sensex inches up on mixed earnings and FII inflows into India",
+                "summary": "Auto and pharma stocks gain; RBI policy stance remains supportive",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "Business Standard",
+                "url": "https://example.com/sensex-fii",
+            },
+            {
+                "title": "BSE frontliners rally on infrastructure boost and RBI's growth focus",
+                "summary": "Banking and construction stocks lead; fiscal stimulus expectations support sentiment",
+                "published_at": f"{datetime.now().isoformat()}",
+                "source": "The Hindu",
+                "url": "https://example.com/sensex-infra",
+            },
+        ],
+    }
+
+    articles = index_articles.get(index_name, [
+        {
+            "title": f"{index_name} shows mixed signals amid global economic uncertainty",
+            "summary": "Market dynamics remain fluid as geopolitical tensions persist",
+            "published_at": f"{datetime.now().isoformat()}",
+            "source": "Reuters",
+            "url": "https://example.com/index-mixed",
+        }
+    ])
+
+    return articles[:5]  # Return max 5 articles

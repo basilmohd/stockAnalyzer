@@ -58,6 +58,15 @@ CHAT_HISTORY_MAX_MESSAGES = 10              # Keep last N messages in conversati
 CHAT_HISTORY_TTL = 86400                    # 24 hours in seconds
 CHAT_CONTEXT_SOURCES = ["portfolio", "technicals", "news", "risk_flags"]  # Data to include in context
 
+# ── Global Market Research ───────────────────────────────────────────────────
+GLOBAL_RESEARCH_INDICES = [
+    "S&P 500", "Dow Jones", "NASDAQ",           # US markets
+    "DAX", "FTSE 100", "Euronext 50",           # European markets
+    "Nifty 50", "Sensex"                        # Indian markets
+]
+GLOBAL_RESEARCH_CACHE_TTL = 604800              # 7 days (weekly data)
+GLOBAL_RESEARCH_MAX_CHUNK_SIZE = 3500           # For Telegram chunking (leaves margin for formatting)
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_ROTATION = "midnight"

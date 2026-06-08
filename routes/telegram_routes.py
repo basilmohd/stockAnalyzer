@@ -79,6 +79,44 @@ async def telegram_webhook(request: Request) -> dict:
                     alert_type="INFO",
                 )
 
+        elif action == "exit_sell":
+            result = validate_token(token)
+            if not result["valid"]:
+                await _answer_callback_query(query_id, f"❌ {result['reason']}")
+            else:
+                await _answer_callback_query(query_id, "⚙️ Selling…")
+                from agent.exit_monitor import (
+                    _get_current_price,
+                    execute_exit,
+                    resolve_trade_id,
+                )
+                from agent.journal import get_trade
+
+                trade_id = resolve_trade_id(token)
+                if trade_id is None:
+                    await send_alert(
+                        "Exit Error",
+                        "⚠️ Could not resolve this exit alert — please re-run the exit check.",
+                        alert_type="WARNING",
+                    )
+                else:
+                    mark_approved(token)
+                    trade = get_trade(trade_id)
+                    current_price = (
+                        _get_current_price(trade.symbol) if trade else None
+                    ) or 0.0
+                    await execute_exit(trade_id, current_price)
+
+        elif action == "exit_hold":
+            result = validate_token(token)
+            if not result["valid"]:
+                await _answer_callback_query(query_id, f"❌ {result['reason']}")
+            else:
+                mark_skipped(token)
+                await _answer_callback_query(query_id, "⏸ Holding.")
+                from agent.exit_monitor import handle_exit_hold
+                await handle_exit_hold(token)
+
         else:
             logger.warning("Unknown callback action: %s", action)
 

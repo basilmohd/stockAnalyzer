@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional
 import time
 
+import config
 from config import (
     KITE_API_KEY,
     KITE_API_SECRET,
@@ -229,10 +230,26 @@ class KiteClient:
 
     # ── Trading ───────────────────────────────────────────────────────────────
 
+    def _paper_fill_price(self, symbol: str) -> float:
+        """Best-effort current price to 'fill' a paper order at.
+
+        Tries the live/mock quote; falls back to 0.0 if the quote is unavailable so
+        a paper order never raises (the caller treats 0.0 as a soft fill price).
+        """
+        try:
+            quote = self.get_quote([f"NSE:{symbol}"])
+            data = quote.get(f"NSE:{symbol}") or quote.get(symbol) or {}
+            return float(data.get("last_price", 0.0))
+        except Exception as exc:
+            logger.warning("paper fill price lookup failed for %s: %s", symbol, exc)
+            return 0.0
+
     def place_order(self, symbol: str, action: str, quantity: int) -> dict:
         """Place a CNC MARKET order for a signal. action: BUY/SELL/REDUCE/EXIT.
 
         Never raises — returns error dict on failure.
+        Paper: PAPER_TRADE_MODE checked FIRST — "fills" at the live quote price and
+        returns a PAPER-{symbol}-{ts} order_id; the real broker is never reached.
         Mock: returns MOCK-{symbol}-{timestamp} order_id.
         Real: REDUCE sells 50% of current holdings; EXIT sells all.
         """
@@ -246,9 +263,27 @@ class KiteClient:
                 }
 
             logger.info(
-                "place_order: symbol=%s action=%s qty=%d mock=%s",
-                symbol, action, quantity, self.mock,
+                "place_order: symbol=%s action=%s qty=%d mock=%s paper=%s",
+                symbol, action, quantity, self.mock, config.PAPER_TRADE_MODE,
             )
+
+            # PAPER MODE — must precede the live branch so a real order is never
+            # placed while paper mode is on. "Fills" at the current quote price.
+            if config.PAPER_TRADE_MODE:
+                fill_price = self._paper_fill_price(symbol)
+                order_id = f"PAPER-{symbol}-{int(_time.time())}"
+                logger.info(
+                    "📝 PAPER ORDER: %s %d %s @ %s", action, quantity, symbol, fill_price
+                )
+                return {
+                    "order_id": order_id,
+                    "status": "COMPLETE",
+                    "symbol": symbol,
+                    "action": action,
+                    "quantity": quantity,
+                    "fill_price": fill_price,
+                    "is_paper": True,
+                }
 
             if self.mock:
                 order_id = f"MOCK-{symbol}-{int(_time.time())}"

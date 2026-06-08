@@ -7,43 +7,12 @@ capital, and the weekly loss circuit breaker. Risk limits are read from config a
 call time so they stay overridable/testable.
 """
 import config
-from agent.sizing import _open_positions_proxy, get_available_capital
+from agent.journal import get_open_positions_summary
+from agent.sizing import get_available_capital
 from agent.strategy import SECTOR_MAP
 from core.logger import get_logger
 
 logger = get_logger(__name__)
-
-
-def get_open_positions_summary() -> dict:
-    """Snapshot of currently open positions for guard checks and reporting.
-
-    PROXY (Week 9): open positions come from APPROVED ActionLog rows; realized
-    weekly PnL is not yet tracked (no exit/close records) so week_pnl is 0.0.
-    TODO(Week 10): replace proxy reads with OPEN/CLOSED rows from the Trade table.
-
-    Returns:
-        dict with open_count, symbols, by_sector, total_value, week_pnl.
-    """
-    positions = _open_positions_proxy()
-    symbols = [p["symbol"] for p in positions]
-
-    by_sector: dict[str, int] = {}
-    for p in positions:
-        sector = SECTOR_MAP.get(p["symbol"], "Unknown")
-        by_sector[sector] = by_sector.get(sector, 0) + 1
-
-    total_value = round(sum(p["value"] for p in positions), 2)
-
-    # TODO(Week 10): sum realized PnL of positions closed this week (Trade table).
-    week_pnl = 0.0
-
-    return {
-        "open_count": len(positions),
-        "symbols": symbols,
-        "by_sector": by_sector,
-        "total_value": total_value,
-        "week_pnl": week_pnl,
-    }
 
 
 def check_guards(signal: dict, position: dict) -> tuple[bool, str]:

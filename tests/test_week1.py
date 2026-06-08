@@ -57,8 +57,14 @@ def test_kite_client_get_quote():
 
 # ── 5. Order placement ────────────────────────────────────────────────────────
 
-def test_kite_client_place_order_mock():
-    """Mock place_order(symbol, action, qty) returns order_id containing 'MOCK'."""
+def test_kite_client_place_order_mock(monkeypatch):
+    """Mock place_order(symbol, action, qty) returns order_id containing 'MOCK'.
+
+    Paper mode (default since Week 10) is checked before the mock branch, so disable
+    it here to exercise the mock order path specifically.
+    """
+    import config
+    monkeypatch.setattr(config, "PAPER_TRADE_MODE", False)
     from core.kite_client import KiteClient
     result = KiteClient().place_order("ICICIBANK", "BUY", 10)
     assert "order_id" in result

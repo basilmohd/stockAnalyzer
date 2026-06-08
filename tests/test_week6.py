@@ -178,8 +178,14 @@ def test_format_signal_telegram_confidence_bar():
 
 # ── 9. place_order mock returns order_id ─────────────────────────────────────
 
-def test_place_order_mock_returns_order_id():
-    """place_order in mock mode returns an order_id containing 'MOCK'."""
+def test_place_order_mock_returns_order_id(monkeypatch):
+    """place_order in mock mode returns an order_id containing 'MOCK'.
+
+    Paper mode (default since Week 10) takes precedence over the mock branch, so
+    disable it here to test the mock order path specifically.
+    """
+    import config
+    monkeypatch.setattr(config, "PAPER_TRADE_MODE", False)
     from core.kite_client import KiteClient
 
     result = KiteClient().place_order("ICICIBANK", "BUY", 10)

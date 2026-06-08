@@ -10,7 +10,7 @@ import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config import REDIS_URL, TIMEZONE
+from config import REDIS_URL, TIMEZONE, PAPER_TRADE_MODE
 from core.db import init_db
 from core.exception_handler import safe_run
 from core.logger import get_logger
@@ -50,6 +50,12 @@ async def sl_monitor_job() -> None:
     """Stop-loss monitor — runs every 5 min, guarded to market hours."""
     from agent.stoploss import run_with_market_check
     await safe_run("sl_monitor", run_with_market_check)
+
+
+async def exit_monitor_job() -> None:
+    """Exit monitor — runs every 5 min, guarded to market hours (target/SL/time-stop)."""
+    from agent.exit_monitor import run_with_market_check
+    await safe_run("exit_monitor", run_with_market_check)
 
 
 async def refresh_technicals_job() -> None:
@@ -190,6 +196,11 @@ async def main() -> None:
     init_db()
     logger.info("Database initialized")
 
+    if PAPER_TRADE_MODE:
+        logger.warning("⚠️  PAPER TRADE MODE ACTIVE — no real orders will be placed")
+    else:
+        logger.warning("🔴 LIVE TRADING MODE — real orders WILL be placed")
+
     scheduler = AsyncIOScheduler(timezone=IST)
 
     # ── 10-job schedule ───────────────────────────────────────────────────────
@@ -208,6 +219,11 @@ async def main() -> None:
         sl_monitor_job,
         "interval", minutes=5,
         id="sl_monitor", name="SL Monitor (5min)",
+    )
+    scheduler.add_job(
+        exit_monitor_job,
+        "interval", minutes=5,
+        id="exit_monitor", name="Exit Monitor (5min)",
     )
     scheduler.add_job(
         refresh_technicals_job,

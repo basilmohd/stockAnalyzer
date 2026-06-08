@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 
-from config import USE_MOCK, USE_MOCK_KITE, REDIS_URL
+from config import USE_MOCK, USE_MOCK_KITE, REDIS_URL, PAPER_TRADE_MODE
 from core.db import init_db
 from core.redis_client import RedisClient
 from routes.approval_routes import router as approval_router
@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup / shutdown lifecycle."""
     logger.info("Starting Portfolio Agent — Webhook Server")
+    if PAPER_TRADE_MODE:
+        logger.warning("⚠️  PAPER TRADE MODE ACTIVE — no real orders will be placed")
+    else:
+        logger.warning("🔴 LIVE TRADING MODE — real orders WILL be placed")
     app.state.redis = RedisClient(REDIS_URL)
     init_db()
     # Register bot commands with Telegram
@@ -240,6 +244,62 @@ def guard_status() -> dict:
         "open_positions": get_open_positions_summary(),
         "capital": get_available_capital(),
     }
+
+
+def _serialize_trade(t) -> dict:
+    """Flatten a Trade ORM row to a JSON-friendly dict for the debug endpoints."""
+    return {
+        "id": t.id,
+        "symbol": t.symbol,
+        "strategy_type": t.strategy_type,
+        "entry_date": t.entry_date.isoformat() if t.entry_date else None,
+        "entry_price": t.entry_price,
+        "quantity": t.quantity,
+        "position_value": t.position_value,
+        "target_price": t.target_price,
+        "stop_loss_price": t.stop_loss_price,
+        "time_stop_date": t.time_stop_date.isoformat() if t.time_stop_date else None,
+        "status": t.status,
+        "exit_date": t.exit_date.isoformat() if t.exit_date else None,
+        "exit_price": t.exit_price,
+        "exit_reason": t.exit_reason,
+        "pnl": t.pnl,
+        "pnl_pct": t.pnl_pct,
+        "order_id": t.order_id,
+        "exit_order_id": t.exit_order_id,
+        "is_paper": t.is_paper,
+        "signal_id": t.signal_id,
+        "action_log_id": t.action_log_id,
+    }
+
+
+@app.get("/trades/open")
+def trades_open() -> list:
+    """List all OPEN trades as JSON."""
+    from agent.journal import get_open_trades
+    return [_serialize_trade(t) for t in get_open_trades()]
+
+
+@app.get("/trades/closed")
+def trades_closed() -> list:
+    """List all CLOSED trades (with realized pnl) as JSON."""
+    from agent.journal import get_closed_trades
+    return [_serialize_trade(t) for t in get_closed_trades()]
+
+
+@app.get("/trades/summary")
+def trades_summary() -> dict:
+    """Return the real open-positions summary (count, sectors, value, week pnl)."""
+    from agent.journal import get_open_positions_summary
+    return get_open_positions_summary()
+
+
+@app.post("/exit/check")
+async def exit_check() -> dict:
+    """Manually run the exit monitor — sends exit alerts, returns triggered list."""
+    from agent.exit_monitor import check_exit_conditions
+    triggered = await check_exit_conditions()
+    return {"triggered": triggered, "count": len(triggered)}
 
 
 if __name__ == "__main__":

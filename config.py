@@ -25,6 +25,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data_store/portfolio.db")
 USE_MOCK = os.getenv("USE_MOCK", "true").lower() == "true"
 USE_MOCK_KITE = os.getenv("USE_MOCK_KITE", str(USE_MOCK).lower()).lower() == "true"
 
+# ── Trading Mode ──────────────────────────────────────────────────────────────
+# When True, approved signals create simulated (paper) trades and place_order
+# "fills" at the live quote price WITHOUT ever hitting the real broker. Exit
+# monitor sells are simulated too. Keep True until live-trading validation is done.
+# This check must precede every real-order path so live is unreachable in paper mode.
+PAPER_TRADE_MODE = os.getenv("PAPER_TRADE_MODE", "true").lower() == "true"
+
 # ── Market Rules ──────────────────────────────────────────────────────────────
 MARKET_OPEN = "09:15"
 MARKET_CLOSE = "15:30"
@@ -51,6 +58,14 @@ MAX_OPEN_POSITIONS = int(os.getenv("MAX_OPEN_POSITIONS", "4"))       # Max concu
 MAX_SAME_SECTOR = int(os.getenv("MAX_SAME_SECTOR", "2"))             # Max open positions per sector
 WEEKLY_LOSS_LIMIT = float(os.getenv("WEEKLY_LOSS_LIMIT", "0.05"))    # Pause trading after 5% weekly loss
 MIN_ORDER_VALUE = float(os.getenv("MIN_ORDER_VALUE", "2000"))        # Skip orders below ₹2000
+
+# Time-stop horizon (calendar days from entry) per strategy. A trade still open
+# past this date is a candidate for a TIME_STOP exit (exit monitor, Week 11).
+TIME_STOP_BY_STRATEGY: dict[str, int] = {
+    "SWING_TRADE": 10,
+    "TREND_FOLLOW": 30,
+    "MEAN_REVERSION": 15,
+}
 
 # ── Cache Settings ────────────────────────────────────────────────────────────
 HOLDINGS_CACHE_TTL = 60         # Holdings cache TTL in seconds (1 minute for fresher SL monitoring)

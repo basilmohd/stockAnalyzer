@@ -5,9 +5,7 @@ MAX_RISK_PER_TRADE, MAX_POSITION_PCT, CASH_RESERVE_PCT, MIN_ORDER_VALUE) — nev
 hardcode them here, and never bind them at import (so they stay overridable/testable).
 """
 import config
-from core.db import get_db
 from core.logger import get_logger
-from models.action_log import ActionLog
 
 logger = get_logger(__name__)
 
@@ -80,47 +78,22 @@ def calculate_position(
     }
 
 
-def _open_positions_proxy() -> list[dict]:
-    """Return the agent's currently open positions as a list of dicts.
-
-    PROXY (Week 9): APPROVED ActionLog rows stand in for live positions, valued at
-    suggested_qty * entry_price.
-    TODO(Week 10): replace with a read of OPEN rows from the Trade table — ActionLog
-    records the decision, not the live position (no exit/close tracking yet).
-    """
-    positions: list[dict] = []
-    with get_db() as db:
-        rows = (
-            db.query(ActionLog)
-            .filter(ActionLog.action_taken == "APPROVED")
-            .all()
-        )
-        for r in rows:
-            qty = r.suggested_qty or 0
-            price = r.entry_price or 0.0
-            positions.append(
-                {
-                    "symbol": r.symbol,
-                    "quantity": qty,
-                    "entry_price": price,
-                    "value": round(qty * price, 2),
-                }
-            )
-    return positions
-
-
 def get_available_capital() -> dict:
     """Return deployable capital after open positions and the cash reserve.
 
     deployable = TOTAL_CAPITAL - open_positions_value - (TOTAL_CAPITAL * CASH_RESERVE_PCT)
 
+    open_positions_value is the mark-to-market value (quantity × current price) of all
+    OPEN rows in the Trade table — the real ledger, not the Week 9 ActionLog proxy.
+
     Returns:
         dict with total_capital, open_positions_value, available, reserve_required,
         deployable.
     """
+    from agent.journal import get_open_positions_summary
+
     total_capital = config.TOTAL_CAPITAL
-    positions = _open_positions_proxy()
-    open_positions_value = round(sum(p["value"] for p in positions), 2)
+    open_positions_value = get_open_positions_summary()["total_value"]
     available = round(total_capital - open_positions_value, 2)
     reserve_required = round(total_capital * config.CASH_RESERVE_PCT, 2)
     deployable = round(available - reserve_required, 2)

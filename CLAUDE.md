@@ -167,6 +167,19 @@ Week 9 COMPLETE ✓
 - webhook_server.py: GET /sizing/preview, GET /guard/status debug endpoints
 - tests/test_week9.py: 13 tests (10 spec + 3 regression extras); full suite 185 passed / 2 skipped
 
+Week 10 COMPLETE ✓ — Trade ledger + paper trading + exit monitor
+- config.py: PAPER_TRADE_MODE (default true; checked BEFORE every real-order path so live is unreachable in paper mode); TIME_STOP_BY_STRATEGY (SWING 10 / TREND 30 / MEAN_REVERSION 15); .env.example updated
+- webhook_server.py + scheduler.py: startup banner prints "⚠️ PAPER TRADE MODE ACTIVE" / "🔴 LIVE TRADING MODE" on every boot
+- models/trade.py: Trade ledger ORM (entry/exit/pnl/time_stop/is_paper/links), indexed on status+symbol+entry_date; registered in core/db.py; action_logs.trade_id safety migration added
+- core/kite_client.py: place_order paper-aware — PAPER_TRADE_MODE branch FIRST, "fills" at live quote, returns PAPER-{symbol}-{ts} + fill_price + is_paper; real broker never reached in paper mode
+- agent/journal.py: open_trade (links ActionLog.trade_id), close_trade (realized pnl/pnl_pct), get_open_trades, get_closed_trades(since), get_trade, get_open_positions_summary (REAL Trade reads, mark-to-market value + realized week_pnl) — replaces Week 9 proxy
+- agent/sizing.py + agent/portfolio_guard.py: rewired to real Trade table (get_open_positions_summary / get_available_capital read OPEN trades at current price); _open_positions_proxy removed
+- routes/approval_routes.py: APPROVE path opens a real Trade on BUY (✅ Trade Opened (PAPER)), records EXECUTION_FAILED on order failure
+- agent/exit_monitor.py: check_exit_conditions (STOPLOSS → TARGET → TIME_STOP, 30-min Redis cooldown per trade), format_exit_telegram, execute_exit (paper-aware SELL → close_trade → ✅ Position Closed), handle_exit_hold (2h cooldown); run_with_market_check gate
+- scheduler.py: exit_monitor job every 5 min (market-hours gated); routes/telegram_routes.py: exit_sell / exit_hold callbacks wired
+- webhook_server.py: GET /trades/open, GET /trades/closed, GET /trades/summary, POST /exit/check debug endpoints
+- tests/test_week10.py: 11 tests (isolated temp SQLite, PAPER_TRADE_MODE forced); test_week1 + test_week6 mock-order tests now pin PAPER_TRADE_MODE=False; full suite 196 passed / 2 skipped
+
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday
 - Exchange: NSE

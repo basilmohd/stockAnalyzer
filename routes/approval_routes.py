@@ -7,7 +7,8 @@ from datetime import datetime
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from agent.journal import update_action_log
+from agent.journal import open_trade, update_action_log
+from config import PAPER_TRADE_MODE
 from core.approval import mark_approved, mark_skipped, validate_token
 from core.db import get_db
 from core.telegram_bot import send_alert
@@ -164,8 +165,64 @@ async def handle_signal_execution(token: str) -> dict:
             db.commit()
 
         mark_approved(token)
-        # Record the user's APPROVE on the signal's ActionLog (Trade creation: Week 10).
-        update_action_log(signal_id, "APPROVED")
+        # Flip the signal's PENDING ActionLog → APPROVED; capture its id to link the Trade.
+        action_log_id = update_action_log(signal_id, "APPROVED")
+
+        # Open a Trade ledger row for new BUY entries (paper or live). Exit-side
+        # actions (SELL/REDUCE/EXIT) close positions and are handled by the exit
+        # monitor (Week 11), not opened here.
+        if action.upper() == "BUY":
+            from models.action_log import ActionLog
+
+            strategy_type = suggested_sl = suggested_target = None
+            sized_qty = quantity
+            if action_log_id:
+                with get_db() as db:
+                    al = db.query(ActionLog).filter(ActionLog.id == action_log_id).first()
+                    if al:
+                        strategy_type = al.strategy_type
+                        suggested_sl = al.suggested_sl
+                        suggested_target = al.suggested_target
+                        sized_qty = al.suggested_qty or quantity
+
+            # Actual fill price (paper mode fills at the live quote). Fall back to the
+            # ActionLog entry price if a fill price wasn't reported (mock/live paths).
+            fill_price = order_result.get("fill_price")
+            if not fill_price and action_log_id:
+                fill_price = al.entry_price if al else 0.0
+            fill_price = fill_price or 0.0
+
+            signal_for_trade = {
+                "symbol": symbol,
+                "strategy_type": strategy_type,
+                "quantity": sized_qty,
+                "suggested_sl": suggested_sl,
+                "suggested_target": suggested_target,
+                "signal_id": signal_id,
+            }
+            trade_id = open_trade(signal_for_trade, fill_price, order_id, action_log_id)
+
+            paper_tag = " (PAPER)" if PAPER_TRADE_MODE else ""
+            target_str = f"₹{suggested_target:.2f}" if suggested_target else "—"
+            sl_str = f"₹{suggested_sl:.2f}" if suggested_sl else "—"
+            await send_alert(
+                "Trade Opened",
+                (
+                    f"✅ *Trade Opened{paper_tag}*\n"
+                    f"{symbol} | BUY {sized_qty} @ ₹{fill_price:.2f}\n"
+                    f"🎯 Target: {target_str} | 🛡 SL: {sl_str}\n"
+                    f"Order: {order_id}"
+                ),
+                alert_type="SUCCESS",
+            )
+            logger.info(
+                "Trade opened: %s BUY qty=%d fill=%.2f order_id=%s trade_id=%s (paper=%s)",
+                symbol, sized_qty, fill_price, order_id, trade_id, PAPER_TRADE_MODE,
+            )
+            return {
+                "status": "ok", "order_id": order_id, "symbol": symbol,
+                "action": action, "trade_id": trade_id,
+            }
 
         await send_alert(
             "Order Executed",
@@ -175,7 +232,9 @@ async def handle_signal_execution(token: str) -> dict:
         logger.info("Order executed: %s %s qty=%d order_id=%s", symbol, action, quantity, order_id)
         return {"status": "ok", "order_id": order_id, "symbol": symbol, "action": action}
 
+    # Order failed — record EXECUTION_FAILED on the signal's ActionLog and alert.
     error = order_result.get("error", "Unknown error")
+    update_action_log(signal_id, "EXECUTION_FAILED")
     await send_alert("Order Failed", f"❌ Order Failed — {error}", alert_type="WARNING")
     logger.error("Order execution failed: %s %s: %s", symbol, action, error)
     return {"status": "error", "reason": error}

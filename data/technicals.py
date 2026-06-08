@@ -89,10 +89,18 @@ def compute_indicators(df: pd.DataFrame) -> IndicatorResult:
 
     # SMA 50 and 200
     sma50_series = df.ta.sma(length=50)
-    sma200_series = df.ta.sma(length=200)
     sma_50 = float(sma50_series.iloc[-1])
-    sma200_raw = sma200_series.iloc[-1]
-    sma_200 = float(sma200_raw) if not pd.isna(sma200_raw) else sma_50
+
+    # pandas_ta.sma(length=200) returns the input DataFrame unchanged (not a
+    # NaN-filled Series) when fewer than 200 rows are available — guard on row
+    # count instead of pd.isna to avoid an ambiguous-Series comparison for
+    # recently listed stocks that don't yet have 200 days of history.
+    if len(df) >= 200:
+        sma200_series = df.ta.sma(length=200)
+        sma200_raw = sma200_series.iloc[-1]
+        sma_200 = float(sma200_raw) if not pd.isna(sma200_raw) else sma_50
+    else:
+        sma_200 = sma_50
 
     last_close = float(close.iloc[-1])
 

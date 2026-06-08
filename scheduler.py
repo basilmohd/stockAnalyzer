@@ -103,6 +103,12 @@ async def weekly_health_job() -> None:
     await safe_run("weekly_health", send_weekly_health_report)
 
 
+async def weekly_analytics_job() -> None:
+    """Weekly paper-trade performance report (Sunday 09:00 IST)."""
+    from agent.analytics import send_weekly_report
+    await safe_run("weekly_analytics", send_weekly_report)
+
+
 async def token_cleanup_job() -> None:
     """Midnight cleanup — expire stale approval tokens (00:00 daily)."""
     from core.approval import cleanup_expired_tokens
@@ -257,6 +263,12 @@ async def main() -> None:
         weekly_health_job,
         CronTrigger(hour=3, minute=45, day_of_week="fri", timezone=IST),
         id="weekly_health", name="Weekly Health Report",
+        misfire_grace_time=7200,  # Allow up to 2 hours late execution
+    )
+    scheduler.add_job(
+        weekly_analytics_job,
+        CronTrigger(hour=9, minute=0, day_of_week="sun", timezone=IST),
+        id="weekly_analytics", name="Weekly Performance Report (Sun 9 AM)",
         misfire_grace_time=7200,  # Allow up to 2 hours late execution
     )
     scheduler.add_job(

@@ -302,6 +302,54 @@ async def exit_check() -> dict:
     return {"triggered": triggered, "count": len(triggered)}
 
 
+@app.get("/performance")
+def performance(since: str | None = None) -> dict:
+    """Paper-trade dashboard — full performance stats from the closed Trade ledger.
+
+    Optional ?since=YYYY-MM-DD limits to trades exited on/after that date.
+    """
+    from datetime import date as _date
+
+    from agent.analytics import compute_performance_stats
+
+    since_date = None
+    if since:
+        try:
+            since_date = _date.fromisoformat(since)
+        except ValueError:
+            return {"error": f"invalid since date: {since!r} (expected YYYY-MM-DD)"}
+    return compute_performance_stats(since_date)
+
+
+@app.get("/performance/summary")
+def performance_summary() -> dict:
+    """Quick view — only the summary block (win_rate, total_pnl, expectancy, …)."""
+    from agent.analytics import compute_performance_stats
+    return compute_performance_stats()["summary"]
+
+
+@app.get("/performance/strategy")
+def performance_strategy() -> dict:
+    """Per-strategy breakdown — see which strategy is winning."""
+    from agent.analytics import compute_performance_stats
+    return compute_performance_stats()["by_strategy"]
+
+
+@app.get("/performance/go-live")
+def performance_go_live() -> dict:
+    """Data-driven paper → live readiness gate (5 conditions + checklist)."""
+    from agent.analytics import should_go_live
+    return should_go_live()
+
+
+@app.post("/performance/report")
+async def performance_report() -> dict:
+    """Manually trigger the weekly report to Telegram; returns the stats dict."""
+    from agent.analytics import compute_performance_stats, send_weekly_report
+    await send_weekly_report()
+    return compute_performance_stats()
+
+
 if __name__ == "__main__":
     import uvicorn
 

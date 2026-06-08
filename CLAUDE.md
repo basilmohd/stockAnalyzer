@@ -180,6 +180,15 @@ Week 10 COMPLETE ✓ — Trade ledger + paper trading + exit monitor
 - webhook_server.py: GET /trades/open, GET /trades/closed, GET /trades/summary, POST /exit/check debug endpoints
 - tests/test_week10.py: 11 tests (isolated temp SQLite, PAPER_TRADE_MODE forced); test_week1 + test_week6 mock-order tests now pin PAPER_TRADE_MODE=False; full suite 196 passed / 2 skipped
 
+Week 11 COMPLETE ✓ — Performance analytics + weekly report + paper-trade dashboard
+- agent/analytics.py: compute_performance_stats(since) — win_rate, expectancy, avg win/loss, total_pnl, best/worst trade, avg_hold_days; by_strategy (SWING/MEAN_REVERSION/TREND_FOLLOW), by_exit_reason (TARGET/STOPLOSS/TIME_STOP/MANUAL), weekly_pnl (last 8 ISO weeks newest-first), open_positions (mark-to-market via Redis quote:{symbol}, falls back to entry), capital block; empty-but-valued dict when no closed trades
+- CONVENTION: every ratio is a FRACTION (win_rate, avg_win_pct, avg_loss_pct, expectancy, avg_pnl_pct, total_return_pct, best/worst pnl_pct) matching Trade.pnl_pct as stored; Telegram renders with percent format specifiers (0.024 → "+2.40%")
+- agent/analytics.py: format_weekly_report (rich HTML — This Week / All-Time / Best Strategy / Exit Breakdown / Open Positions / best+worst; PAPER watermark; ⚠️ negative-expectancy "do not go live" warning; ✅ positive-edge nudge when expectancy>0 & win_rate>0.55 & trades≥10; no-trades placeholder), send_weekly_report (sends Telegram + caches stats to Redis analytics:latest, 7-day TTL)
+- agent/analytics.py: get_best_strategy (highest expectancy, min 3 trades/strategy, else None), should_go_live (5 conditions: ≥20 trades, win_rate≥0.55, expectancy>0, ≥4 weeks, max weekly drawdown <10% of capital → ready/conditions/missing/message)
+- scheduler.py: weekly_analytics_job → send_weekly_report at Sunday 09:00 IST (safe_run wrapped, 2h misfire grace)
+- webhook_server.py: GET /performance (full, ?since=YYYY-MM-DD), GET /performance/summary, GET /performance/strategy, GET /performance/go-live, POST /performance/report (sends report + returns stats)
+- tests/test_week11.py: 12 tests (isolated temp SQLite, PAPER_TRADE_MODE forced; make_trade helper inserts closed trades; should_go_live tests monkeypatch compute_performance_stats); full suite 208 passed / 2 skipped
+
 ## Indian Market Context
 - Market hours: 09:15 to 15:30 IST, Monday to Friday
 - Exchange: NSE
